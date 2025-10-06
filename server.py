@@ -602,10 +602,16 @@ class CometMCPServer:
             tag_filter = f", '{tag}'" if tag else ""
             match_method = "===" if exact else "includes"
 
+            # Prepare tags list outside f-string to avoid backslash issue
+            if tag:
+                tags_js = f"['{tag}']"
+            else:
+                tags_js = "['button', 'a', '[role=\"button\"]', '[role=\"tab\"]', 'input[type=\"button\"]', 'input[type=\"submit\"]', '[onclick]']"
+
             js_code = f"""
             (function() {{
                 // Find all potentially clickable elements
-                const tags = {f"['{tag}']" if tag else "['button', 'a', '[role=\"button\"]', '[role=\"tab\"]', 'input[type=\"button\"]', 'input[type=\"submit\"]', '[onclick]']"};
+                const tags = {tags_js};
                 const selector = tags.join(', ');
                 const elements = Array.from(document.querySelectorAll(selector));
 
