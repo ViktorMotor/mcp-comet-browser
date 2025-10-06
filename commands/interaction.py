@@ -243,7 +243,8 @@ class ClickByTextCommand(Command):
             if tag:
                 tags_js = f"['{tag}']"
             else:
-                tags_js = "['button', 'a', '[role=\"button\"]', '[role=\"tab\"]', 'input[type=\"button\"]', 'input[type=\"submit\"]', '[onclick]']"
+                # Expanded list to include divs and spans that might be clickable
+                tags_js = "['button', 'a', '[role=\"button\"]', '[role=\"tab\"]', 'input[type=\"button\"]', 'input[type=\"submit\"]', '[onclick]', 'div[onclick]', 'span[onclick]', 'div[role]', 'span[role]']"
 
             js_code = f"""
             (function() {{
@@ -252,26 +253,49 @@ class ClickByTextCommand(Command):
                 const elements = Array.from(document.querySelectorAll(selector));
 
                 const searchText = '{text}';
-                const el = elements.find(e =>
-                    (e.textContent.trim() {match_method} searchText) ||
-                    (e.getAttribute('aria-label') {match_method} searchText) ||
-                    (e.title {match_method} searchText) ||
-                    (e.value {match_method} searchText)
-                );
+
+                // Find element with better filtering - only visible and clickable
+                const el = elements.find(e => {{
+                    const rect = e.getBoundingClientRect();
+                    const isVisible = rect.width > 0 && rect.height > 0 &&
+                                     e.offsetParent !== null &&
+                                     window.getComputedStyle(e).visibility !== 'hidden';
+
+                    const textMatch = (e.textContent.trim() {match_method} searchText) ||
+                                     (e.getAttribute('aria-label') {match_method} searchText) ||
+                                     (e.title {match_method} searchText) ||
+                                     (e.value {match_method} searchText);
+
+                    return isVisible && textMatch;
+                }});
 
                 if (!el) {{
+                    // Debug: show what we found
+                    const allMatches = elements.filter(e =>
+                        (e.textContent.trim() {match_method} searchText) ||
+                        (e.getAttribute('aria-label') {match_method} searchText)
+                    );
                     return {{
                         success: false,
                         message: 'Element with text not found: {text}',
                         searchedTags: tags,
                         totalElements: elements.length,
+                        matchedButHidden: allMatches.length,
                         availableTexts: elements.slice(0, 10).map(e => e.textContent.trim().substring(0, 50))
                     }};
                 }}
 
                 const rect = el.getBoundingClientRect();
-                const clickX = rect.left + rect.width / 2;
-                const clickY = rect.top + rect.height / 2;
+                const clickX = Math.round(rect.left + rect.width / 2);
+                const clickY = Math.round(rect.top + rect.height / 2);
+
+                // Debug logging
+                console.log('[MCP] Click target:', {{
+                    text: '{text}',
+                    tag: el.tagName,
+                    coords: {{ x: clickX, y: clickY }},
+                    rect: {{ left: rect.left, top: rect.top, width: rect.width, height: rect.height }}
+                }});
 
                 const inViewport = rect.top >= 0 && rect.left >= 0 &&
                                   rect.bottom <= window.innerHeight &&
@@ -280,6 +304,10 @@ class ClickByTextCommand(Command):
                 if (!inViewport) {{
                     el.scrollIntoView({{ behavior: 'smooth', block: 'center', inline: 'center' }});
                     await new Promise(r => setTimeout(r, 300));
+                    // Recalculate after scroll
+                    const newRect = el.getBoundingClientRect();
+                    clickX = Math.round(newRect.left + newRect.width / 2);
+                    clickY = Math.round(newRect.top + newRect.height / 2);
                 }}
 
                 if (window.__moveAICursor__) {{
