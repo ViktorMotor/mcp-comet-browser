@@ -132,27 +132,97 @@ class CometMCPServer:
         """Click on an element matching CSS selector"""
         try:
             await self.ensure_connected()
+            # Enhanced click with detailed diagnostics
             js_code = f"""
             (function() {{
                 const el = document.querySelector('{selector}');
-                if (el) {{
-                    el.click();
-                    return true;
+
+                if (!el) {{
+                    // Check if selector matches multiple elements
+                    const allMatches = document.querySelectorAll('{selector}');
+                    return {{
+                        success: false,
+                        reason: 'not_found',
+                        message: 'Element not found: {selector}',
+                        matchCount: allMatches.length,
+                        suggestion: allMatches.length > 0 ? 'Selector matches ' + allMatches.length + ' elements' : 'No elements match this selector'
+                    }};
                 }}
-                return false;
+
+                // Check if element is visible
+                const rect = el.getBoundingClientRect();
+                const style = window.getComputedStyle(el);
+                const isVisible = rect.width > 0 && rect.height > 0 &&
+                                 style.display !== 'none' &&
+                                 style.visibility !== 'hidden' &&
+                                 style.opacity !== '0';
+
+                if (!isVisible) {{
+                    return {{
+                        success: false,
+                        reason: 'not_visible',
+                        message: 'Element found but not visible',
+                        display: style.display,
+                        visibility: style.visibility,
+                        opacity: style.opacity,
+                        dimensions: {{ width: rect.width, height: rect.height }},
+                        suggestion: 'Element may be hidden or have zero dimensions'
+                    }};
+                }}
+
+                // Check if element is in viewport
+                const inViewport = rect.top >= 0 &&
+                                  rect.left >= 0 &&
+                                  rect.bottom <= window.innerHeight &&
+                                  rect.right <= window.innerWidth;
+
+                // Try to click
+                try {{
+                    el.click();
+                    return {{
+                        success: true,
+                        selector: '{selector}',
+                        message: 'Clicked element: {selector}',
+                        elementInfo: {{
+                            tagName: el.tagName,
+                            id: el.id,
+                            className: el.className,
+                            text: el.textContent.trim().substring(0, 100),
+                            position: {{
+                                top: rect.top,
+                                left: rect.left,
+                                width: rect.width,
+                                height: rect.height
+                            }},
+                            inViewport: inViewport
+                        }}
+                    }};
+                }} catch (clickError) {{
+                    return {{
+                        success: false,
+                        reason: 'click_failed',
+                        message: 'Click failed: ' + clickError.message,
+                        error: clickError.toString()
+                    }};
+                }}
             }})()
             """
 
-            result = self.tab.Runtime.evaluate(expression=js_code)
-            success = result.get('result', {}).get('value', False)
+            result = self.tab.Runtime.evaluate(expression=js_code, returnByValue=True)
+            click_result = result.get('result', {}).get('value', {})
 
-            if success:
+            # Return the detailed result
+            if click_result.get('success'):
                 await asyncio.sleep(0.5)  # Brief wait after click
-                return {"success": True, "selector": selector, "message": f"Clicked element: {selector}"}
-            else:
-                return {"success": False, "message": f"Element not found: {selector}"}
+
+            return click_result
         except Exception as e:
-            raise RuntimeError(f"Failed to click element: {str(e)}")
+            return {
+                "success": False,
+                "reason": "exception",
+                "message": f"Failed to click element: {str(e)}",
+                "error": str(e)
+            }
 
     async def screenshot(self, path: str = "./screenshot.png") -> Dict[str, Any]:
         """Take a screenshot of the current page"""
