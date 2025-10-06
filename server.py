@@ -184,8 +184,26 @@ class MCPJSONRPCServer:
         params = request.get('params', {})
 
         try:
-            # Ensure we're connected
-            await self.initialize()
+            # Handle MCP initialization
+            if method == 'initialize':
+                return {
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "result": {
+                        "protocolVersion": "2024-11-05",
+                        "capabilities": {
+                            "tools": {}
+                        },
+                        "serverInfo": {
+                            "name": "comet-browser",
+                            "version": "1.0.0"
+                        }
+                    }
+                }
+
+            # Ensure we're connected for browser operations
+            if method not in ['initialize', 'tools/list'] and not self.connected:
+                await self.initialize()
 
             # Route to appropriate method
             if method == 'open_url':
@@ -204,6 +222,8 @@ class MCPJSONRPCServer:
                 result = self.list_tools()
             elif method == 'tools/call':
                 # MCP protocol: call a tool
+                if not self.connected:
+                    await self.initialize()
                 tool_name = params.get('name')
                 tool_params = params.get('arguments', {})
                 result = await self.call_tool(tool_name, tool_params)
