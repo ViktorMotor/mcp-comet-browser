@@ -1,0 +1,192 @@
+"""Diagnostic commands for troubleshooting"""
+from typing import Dict, Any
+from .base import Command
+
+
+class EnableConsoleLoggingCommand(Command):
+    """Force enable console logging"""
+
+    @property
+    def name(self) -> str:
+        return "enable_console_logging"
+
+    @property
+    def description(self) -> str:
+        return "Force enable console logging if get_console_logs returns empty results"
+
+    @property
+    def input_schema(self) -> Dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {}
+        }
+
+    async def execute(self, connection=None) -> Dict[str, Any]:
+        """Force re-enable console logging"""
+        if not connection:
+            return {"success": False, "message": "No browser connection"}
+
+        result = await connection.force_enable_console_logging()
+        return result
+
+
+class DiagnosePageCommand(Command):
+    """Diagnose page state and connection"""
+
+    @property
+    def name(self) -> str:
+        return "diagnose_page"
+
+    @property
+    def description(self) -> str:
+        return "Diagnose page state, connection, and common issues"
+
+    @property
+    def input_schema(self) -> Dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {}
+        }
+
+    async def execute(self) -> Dict[str, Any]:
+        """Run diagnostic checks"""
+        try:
+            js_code = """
+            (function() {
+                return {
+                    url: window.location.href,
+                    title: document.title,
+                    readyState: document.readyState,
+                    activeElement: document.activeElement ? {
+                        tag: document.activeElement.tagName,
+                        id: document.activeElement.id,
+                        type: document.activeElement.type
+                    } : null,
+                    viewport: {
+                        width: window.innerWidth,
+                        height: window.innerHeight,
+                        scrollX: window.scrollX,
+                        scrollY: window.scrollY
+                    },
+                    cursors: {
+                        aiCursor: window.__aiCursor__ ? 'initialized' : 'not initialized',
+                        consoleInterceptor: window.__consoleInterceptorInstalled ? 'installed' : 'not installed'
+                    },
+                    counts: {
+                        buttons: document.querySelectorAll('button').length,
+                        links: document.querySelectorAll('a').length,
+                        inputs: document.querySelectorAll('input').length,
+                        tabs: document.querySelectorAll('[role="tab"]').length
+                    },
+                    devtools: {
+                        open: typeof window.chrome !== 'undefined' && typeof window.chrome.devtools !== 'undefined'
+                    }
+                };
+            })()
+            """
+
+            result = self.tab.Runtime.evaluate(expression=js_code, returnByValue=True)
+            diagnostics = result.get('result', {}).get('value', {})
+
+            return {
+                "success": True,
+                "diagnostics": diagnostics
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e),
+                "message": f"Failed to diagnose page: {str(e)}"
+            }
+
+
+class GetClickableElementsCommand(Command):
+    """Get all clickable elements on page"""
+
+    @property
+    def name(self) -> str:
+        return "get_clickable_elements"
+
+    @property
+    def description(self) -> str:
+        return "Get all clickable elements with their positions (for finding hard-to-click elements)"
+
+    @property
+    def input_schema(self) -> Dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "text_filter": {"type": "string", "description": "Filter by text content (optional)"},
+                "visible_only": {"type": "boolean", "description": "Only visible elements", "default": True}
+            }
+        }
+
+    async def execute(self, text_filter: str = None, visible_only: bool = True) -> Dict[str, Any]:
+        """Get all clickable elements"""
+        try:
+            filter_js = f"el.textContent.includes('{text_filter}')" if text_filter else "true"
+
+            js_code = f"""
+            (function() {{
+                const clickableSelectors = [
+                    'button',
+                    'a',
+                    '[role="button"]',
+                    '[role="tab"]',
+                    '[role="link"]',
+                    '[onclick]',
+                    'input[type="button"]',
+                    'input[type="submit"]',
+                    '[tabindex]'
+                ];
+
+                const elements = Array.from(document.querySelectorAll(clickableSelectors.join(',')));
+                const visibleOnly = {str(visible_only).lower()};
+
+                const results = elements
+                    .filter(el => {filter_js})
+                    .map(el => {{
+                        const rect = el.getBoundingClientRect();
+                        const style = window.getComputedStyle(el);
+                        const isVisible = rect.width > 0 && rect.height > 0 &&
+                                         style.display !== 'none' &&
+                                         style.visibility !== 'hidden' &&
+                                         parseFloat(style.opacity) > 0;
+
+                        if (visibleOnly && !isVisible) return null;
+
+                        return {{
+                            tag: el.tagName,
+                            text: el.textContent.trim().substring(0, 60),
+                            id: el.id || null,
+                            role: el.getAttribute('role'),
+                            ariaLabel: el.getAttribute('aria-label'),
+                            visible: isVisible,
+                            position: {{
+                                x: Math.round(rect.left + rect.width / 2),
+                                y: Math.round(rect.top + rect.height / 2),
+                                width: Math.round(rect.width),
+                                height: Math.round(rect.height)
+                            }},
+                            hasClickHandler: el.onclick !== null,
+                            disabled: el.disabled || el.getAttribute('aria-disabled') === 'true'
+                        }};
+                    }})
+                    .filter(el => el !== null);
+
+                return {{
+                    success: true,
+                    count: results.length,
+                    elements: results.slice(0, 50)
+                }};
+            }})()
+            """
+
+            result = self.tab.Runtime.evaluate(expression=js_code, returnByValue=True)
+            return result.get('result', {}).get('value', {})
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e),
+                "message": f"Failed to get clickable elements: {str(e)}"
+            }

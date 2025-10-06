@@ -14,6 +14,10 @@ from commands.tabs import ListTabsCommand, CreateTabCommand, CloseTabCommand, Sw
 from commands.evaluation import EvaluateJsCommand
 from commands.screenshot import ScreenshotCommand
 from commands.search import FindElementsCommand, GetPageStructureCommand
+from commands.helpers import DebugElementCommand, ForceClickCommand
+from commands.diagnostics import (
+    EnableConsoleLoggingCommand, DiagnosePageCommand, GetClickableElementsCommand
+)
 
 
 class MCPJSONRPCServer:
@@ -58,6 +62,15 @@ class MCPJSONRPCServer:
         # Search and query
         self.commands['find_elements'] = FindElementsCommand
         self.commands['get_page_structure'] = GetPageStructureCommand
+
+        # Debugging helpers
+        self.commands['debug_element'] = DebugElementCommand
+        self.commands['force_click'] = ForceClickCommand
+
+        # Diagnostics
+        self.commands['enable_console_logging'] = EnableConsoleLoggingCommand
+        self.commands['diagnose_page'] = DiagnosePageCommand
+        self.commands['get_clickable_elements'] = GetClickableElementsCommand
 
     async def initialize(self):
         """Initialize connection to browser"""
@@ -153,12 +166,14 @@ class MCPJSONRPCServer:
         cmd_instance = cmd_class(tab=self.connection.tab)
 
         # Handle special cases that need extra context
-        if tool_name in ['click', 'click_by_text', 'move_cursor']:
+        if tool_name in ['click', 'click_by_text', 'move_cursor', 'force_click']:
             arguments['cursor'] = self.connection.cursor
         elif tool_name == 'open_url':
             arguments['cursor'] = self.connection.cursor
         elif tool_name == 'get_console_logs':
             arguments['console_logs'] = self.connection.console_logs
+        elif tool_name == 'enable_console_logging':
+            arguments['connection'] = self.connection
         elif tool_name in ['list_tabs', 'create_tab', 'close_tab', 'switch_tab']:
             arguments['browser'] = self.connection.browser
             arguments['current_tab'] = self.connection.tab

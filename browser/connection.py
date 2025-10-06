@@ -97,6 +97,36 @@ class BrowserConnection:
         except Exception as e:
             raise ConnectionError(f"Failed to connect to browser on port {self.debug_port}: {str(e)}")
 
+    async def force_enable_console_logging(self):
+        """Force re-enable console logging and clear any issues"""
+        try:
+            # Re-enable Console domain
+            self.tab.Console.enable()
+            self.tab.Runtime.enable()
+
+            # Clear and re-setup listeners
+            self._setup_console_listeners()
+
+            # Re-initialize JS interceptor
+            await self._initialize_js_console_interceptor()
+
+            # Test that logging works
+            test_result = self.tab.Runtime.evaluate(
+                expression="console.log('MCP Console Test'); 'test-success'",
+                returnByValue=True
+            )
+
+            return {
+                "success": True,
+                "message": "Console logging re-enabled",
+                "test": test_result.get('result', {}).get('value')
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
     def _setup_console_listeners(self):
         """Set up CDP console event listeners"""
         def console_message_handler(message):
