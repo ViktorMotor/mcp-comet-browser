@@ -9,9 +9,9 @@ MCP (Model Context Protocol) сервер для управления брауз
 - **pychrome** — библиотека для взаимодействия с Chrome DevTools Protocol (CDP)
 - **Comet Browser** — запущен с флагом `--remote-debugging-port=9222`
 
-Сервер предоставляет 15 методов:
+Сервер предоставляет 16 методов:
 
-**Базовые:** `open_url`, `get_text`, `click`, `screenshot`, `evaluate_js`
+**Базовые:** `open_url`, `get_text`, `click`, `screenshot`, `evaluate_js`, `scroll_page`
 
 **DevTools:** `open_devtools`, `close_devtools`, `console_command`, `get_console_logs`, `inspect_element`, `get_network_activity`
 
@@ -314,6 +314,26 @@ python server.py
 {"jsonrpc": "2.0", "id": 14, "method": "tools/call", "params": {"name": "close_tab", "arguments": {"tab_id": "TAB_ID_HERE"}}}
 ```
 
+**Прокрутить страницу вниз:**
+```json
+{"jsonrpc": "2.0", "id": 15, "method": "tools/call", "params": {"name": "scroll_page", "arguments": {"direction": "down", "amount": 500}}}
+```
+
+**Прокрутить в конец страницы:**
+```json
+{"jsonrpc": "2.0", "id": 16, "method": "tools/call", "params": {"name": "scroll_page", "arguments": {"direction": "bottom"}}}
+```
+
+**Прокрутить элемент:**
+```json
+{"jsonrpc": "2.0", "id": 17, "method": "tools/call", "params": {"name": "scroll_page", "arguments": {"selector": ".content", "direction": "down", "amount": 300}}}
+```
+
+**Прокрутить к координатам:**
+```json
+{"jsonrpc": "2.0", "id": 18, "method": "tools/call", "params": {"name": "scroll_page", "arguments": {"x": 0, "y": 1000}}}
+```
+
 ## Использование с Claude Code
 
 После подключения вы можете просить Claude:
@@ -333,6 +353,18 @@ python server.py
 
 ```
 Выполни JavaScript: return document.querySelectorAll('a').length
+```
+
+```
+Прокрути страницу вниз на 500 пикселей
+```
+
+```
+Прокрути в конец страницы
+```
+
+```
+Прокрути элемент .content вниз
 ```
 
 **DevTools функционал:**

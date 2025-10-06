@@ -580,6 +580,113 @@ class CometMCPServer:
         except Exception as e:
             raise RuntimeError(f"Failed to switch tab: {str(e)}")
 
+    async def scroll_page(self, direction: str = "down", amount: int = None, x: int = None, y: int = None, selector: str = None) -> Dict[str, Any]:
+        """Scroll the page or a specific element"""
+        try:
+            await self.ensure_connected()
+
+            # Build JavaScript code based on parameters
+            if x is not None and y is not None:
+                # Scroll to specific coordinates
+                js_code = f"""
+                (function() {{
+                    window.scrollTo({x}, {y});
+                    return {{
+                        x: window.pageXOffset || window.scrollX,
+                        y: window.pageYOffset || window.scrollY,
+                        maxX: document.documentElement.scrollWidth - window.innerWidth,
+                        maxY: document.documentElement.scrollHeight - window.innerHeight,
+                        viewportHeight: window.innerHeight,
+                        viewportWidth: window.innerWidth,
+                        pageHeight: document.documentElement.scrollHeight,
+                        pageWidth: document.documentElement.scrollWidth
+                    }};
+                }})()
+                """
+            elif selector:
+                # Scroll specific element
+                if amount is None:
+                    amount = 300
+
+                scroll_delta = amount if direction in ["down", "right"] else -amount
+                scroll_property = "scrollTop" if direction in ["down", "up"] else "scrollLeft"
+
+                js_code = f"""
+                (function() {{
+                    const el = document.querySelector('{selector}');
+                    if (!el) return {{success: false, message: 'Element not found: {selector}'}};
+
+                    el.{scroll_property} += {scroll_delta};
+
+                    return {{
+                        success: true,
+                        element: '{selector}',
+                        scrollTop: el.scrollTop,
+                        scrollLeft: el.scrollLeft,
+                        scrollHeight: el.scrollHeight,
+                        scrollWidth: el.scrollWidth,
+                        clientHeight: el.clientHeight,
+                        clientWidth: el.clientWidth
+                    }};
+                }})()
+                """
+            else:
+                # Scroll whole page by direction
+                if amount is None:
+                    amount = 500  # Default scroll amount in pixels
+
+                if direction == "down":
+                    scroll_expr = f"window.scrollBy(0, {amount})"
+                elif direction == "up":
+                    scroll_expr = f"window.scrollBy(0, -{amount})"
+                elif direction == "left":
+                    scroll_expr = f"window.scrollBy(-{amount}, 0)"
+                elif direction == "right":
+                    scroll_expr = f"window.scrollBy({amount}, 0)"
+                elif direction == "top":
+                    scroll_expr = "window.scrollTo(0, 0)"
+                elif direction == "bottom":
+                    scroll_expr = "window.scrollTo(0, document.documentElement.scrollHeight)"
+                else:
+                    return {"success": False, "message": f"Invalid direction: {direction}. Use: up, down, left, right, top, bottom"}
+
+                js_code = f"""
+                (function() {{
+                    {scroll_expr};
+
+                    return {{
+                        x: window.pageXOffset || window.scrollX,
+                        y: window.pageYOffset || window.scrollY,
+                        maxX: document.documentElement.scrollWidth - window.innerWidth,
+                        maxY: document.documentElement.scrollHeight - window.innerHeight,
+                        viewportHeight: window.innerHeight,
+                        viewportWidth: window.innerWidth,
+                        pageHeight: document.documentElement.scrollHeight,
+                        pageWidth: document.documentElement.scrollWidth,
+                        scrolledToBottom: (window.innerHeight + window.pageYOffset) >= document.documentElement.scrollHeight - 10,
+                        scrolledToTop: window.pageYOffset <= 10
+                    }};
+                }})()
+                """
+
+            result = self.tab.Runtime.evaluate(expression=js_code, returnByValue=True)
+            scroll_info = result.get('result', {}).get('value', {})
+
+            # Handle element-specific scroll result
+            if selector and not scroll_info.get('success', True):
+                return scroll_info
+
+            return {
+                "success": True,
+                "direction": direction if not (x is not None and y is not None) else "absolute",
+                "amount": amount,
+                "selector": selector,
+                "position": scroll_info,
+                "message": f"Scrolled {'element ' + selector if selector else 'page'} {direction if not (x is not None and y is not None) else f'to ({x}, {y})'}"
+            }
+        except Exception as e:
+            raise RuntimeError(f"Failed to scroll page: {str(e)}")
+
     def close(self):
         """Close connection to browser"""
         try:
@@ -830,6 +937,20 @@ class MCPJSONRPCServer:
                         },
                         "required": ["tab_id"]
                     }
+                },
+                {
+                    "name": "scroll_page",
+                    "description": "Scroll the page or a specific element. Returns detailed position information including viewport size, page dimensions, and scroll state.",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "direction": {"type": "string", "description": "Scroll direction: 'up', 'down', 'left', 'right', 'top', 'bottom' (default: 'down')", "default": "down"},
+                            "amount": {"type": "integer", "description": "Pixels to scroll (default: 500 for page, 300 for element)"},
+                            "x": {"type": "integer", "description": "Absolute X coordinate to scroll to (use with y for absolute positioning)"},
+                            "y": {"type": "integer", "description": "Absolute Y coordinate to scroll to (use with x for absolute positioning)"},
+                            "selector": {"type": "string", "description": "CSS selector of element to scroll (scrolls page if omitted)"}
+                        }
+                    }
                 }
             ]
         }
@@ -870,6 +991,13 @@ class MCPJSONRPCServer:
             return await self.comet.close_tab(tab_id)
         elif tool_name == 'switch_tab':
             return await self.comet.switch_tab(arguments['tab_id'])
+        elif tool_name == 'scroll_page':
+            direction = arguments.get('direction', 'down')
+            amount = arguments.get('amount')
+            x = arguments.get('x')
+            y = arguments.get('y')
+            selector = arguments.get('selector')
+            return await self.comet.scroll_page(direction, amount, x, y, selector)
         else:
             raise ValueError(f"Unknown tool: {tool_name}")
 
