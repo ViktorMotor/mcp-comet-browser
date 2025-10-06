@@ -28,3 +28,9 @@ Thumbs.db
 
 # Test files
 test_screenshot.png
+test_*.html
+test_*.py
+.mcp.json
+
+# Screenshots folder
+screenshots/
