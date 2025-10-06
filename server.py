@@ -30,6 +30,7 @@ class CometMCPServer:
         self.debug_host = debug_host or "127.0.0.1"
         self.browser: Optional[pychrome.Browser] = None
         self.tab: Optional[pychrome.Tab] = None
+        self.console_logs = []  # Store console logs from CDP events
 
     async def ensure_connected(self):
         """Ensure we have a valid connection to a browser tab"""
@@ -80,9 +81,152 @@ class CometMCPServer:
             self.tab.Network.enable()  # Enable network monitoring
             self.tab.Debugger.enable()  # Enable debugger
 
+            # Set up console message listener via CDP
+            def console_message_handler(message):
+                """Handle console messages from CDP"""
+                try:
+                    # Extract console message details
+                    log_entry = {
+                        "type": message.get("type", "log"),
+                        "level": message.get("level", "log"),
+                        "text": message.get("text", ""),
+                        "timestamp": message.get("timestamp", 0),
+                        "source": message.get("source", "console-api"),
+                        "url": message.get("url", ""),
+                        "lineNumber": message.get("line", 0)
+                    }
+
+                    # Format args if available
+                    if "args" in message:
+                        args = message["args"]
+                        formatted_args = []
+                        for arg in args:
+                            if arg.get("type") == "string":
+                                formatted_args.append(arg.get("value", ""))
+                            elif arg.get("type") == "number":
+                                formatted_args.append(str(arg.get("value", "")))
+                            else:
+                                formatted_args.append(arg.get("description", str(arg.get("value", ""))))
+                        if formatted_args:
+                            log_entry["text"] = " ".join(formatted_args)
+
+                    self.console_logs.append(log_entry)
+                except Exception as e:
+                    print(f"Error handling console message: {e}", file=sys.stderr)
+
+            # Subscribe to Console.messageAdded events
+            self.tab.Console.messageAdded = console_message_handler
+
+            # Also set up Runtime.consoleAPICalled listener (more reliable)
+            def console_api_handler(method, **kwargs):
+                """Handle Runtime.consoleAPICalled events"""
+                try:
+                    log_type = kwargs.get("type", "log")
+                    args = kwargs.get("args", [])
+                    timestamp = kwargs.get("timestamp", 0)
+
+                    # Format arguments
+                    formatted_messages = []
+                    for arg in args:
+                        if arg.get("type") == "string":
+                            formatted_messages.append(arg.get("value", ""))
+                        elif arg.get("type") in ["number", "boolean"]:
+                            formatted_messages.append(str(arg.get("value", "")))
+                        elif arg.get("type") == "undefined":
+                            formatted_messages.append("undefined")
+                        elif arg.get("type") == "object":
+                            if arg.get("subtype") == "null":
+                                formatted_messages.append("null")
+                            else:
+                                formatted_messages.append(arg.get("description", "[object]"))
+                        else:
+                            formatted_messages.append(arg.get("description", str(arg.get("value", ""))))
+
+                    log_entry = {
+                        "type": log_type,
+                        "message": " ".join(formatted_messages),
+                        "timestamp": timestamp,
+                        "source": "console-api"
+                    }
+
+                    self.console_logs.append(log_entry)
+                except Exception as e:
+                    print(f"Error handling console API call: {e}", file=sys.stderr)
+
+            # Subscribe to Runtime.consoleAPICalled
+            self.tab.set_listener("Runtime.consoleAPICalled", console_api_handler)
+
+            # Also capture exceptions
+            def exception_handler(method, **kwargs):
+                """Handle Runtime.exceptionThrown events"""
+                try:
+                    exception_details = kwargs.get("exceptionDetails", {})
+                    exception = exception_details.get("exception", {})
+                    text = exception_details.get("text", "Exception")
+                    description = exception.get("description", text)
+
+                    log_entry = {
+                        "type": "error",
+                        "message": description,
+                        "timestamp": exception_details.get("timestamp", 0),
+                        "source": "exception",
+                        "url": exception_details.get("url", ""),
+                        "lineNumber": exception_details.get("lineNumber", 0),
+                        "columnNumber": exception_details.get("columnNumber", 0)
+                    }
+
+                    self.console_logs.append(log_entry)
+                except Exception as e:
+                    print(f"Error handling exception: {e}", file=sys.stderr)
+
+            self.tab.set_listener("Runtime.exceptionThrown", exception_handler)
+
+            # Initialize JavaScript interceptor as backup
+            await self._initialize_js_console_interceptor()
+
             return True
         except Exception as e:
             raise ConnectionError(f"Failed to connect to browser on port {self.debug_port}: {str(e)}")
+
+    async def _initialize_js_console_interceptor(self):
+        """Initialize JavaScript console interceptor as backup"""
+        try:
+            js_code = """
+            (function() {
+                if (window.__consoleInterceptorInstalled) {
+                    return {success: true, message: 'Interceptor already installed'};
+                }
+
+                window.__consoleHistory = window.__consoleHistory || [];
+                window.__consoleInterceptorInstalled = true;
+
+                // Intercept console methods
+                ['log', 'warn', 'error', 'info', 'debug'].forEach(function(method) {
+                    const original = console[method];
+                    console[method] = function(...args) {
+                        window.__consoleHistory.push({
+                            type: method,
+                            message: args.map(a => {
+                                try {
+                                    return typeof a === 'object' ? JSON.stringify(a) : String(a);
+                                } catch(e) {
+                                    return String(a);
+                                }
+                            }).join(' '),
+                            timestamp: new Date().toISOString()
+                        });
+                        original.apply(console, args);
+                    };
+                });
+
+                return {success: true, message: 'Console interceptor installed'};
+            })()
+            """
+            result = self.tab.Runtime.evaluate(expression=js_code, returnByValue=True)
+            return result.get('result', {}).get('value', {})
+        except Exception as e:
+            print(f"Failed to initialize JS console interceptor: {e}", file=sys.stderr)
+            return {"success": False, "error": str(e)}
 
     async def open_url(self, url: str) -> Dict[str, Any]:
         """Open a URL in the browser"""
@@ -368,59 +512,84 @@ class CometMCPServer:
             raise RuntimeError(f"Failed to execute console command: {str(e)}")
 
     async def get_console_logs(self, clear: bool = False) -> Dict[str, Any]:
-        """Get console logs from the browser"""
+        """Get console logs from the browser (from CDP events and JS interceptor)"""
         try:
             await self.ensure_connected()
-            # Execute JS to capture console history
+
+            # Get logs from CDP listeners (these are captured in real-time)
+            cdp_logs = self.console_logs.copy()
+
+            # Also get logs from JavaScript interceptor (backup for logs before CDP connection)
             js_code = """
             (function() {
-                // Check if we have console history stored
-                if (!window.__consoleHistory) {
-                    window.__consoleHistory = [];
-
-                    // Intercept console methods
-                    ['log', 'warn', 'error', 'info', 'debug'].forEach(function(method) {
-                        const original = console[method];
-                        console[method] = function(...args) {
-                            window.__consoleHistory.push({
-                                type: method,
-                                message: args.map(a => {
-                                    try {
-                                        return typeof a === 'object' ? JSON.stringify(a) : String(a);
-                                    } catch(e) {
-                                        return String(a);
-                                    }
-                                }).join(' '),
-                                timestamp: new Date().toISOString()
-                            });
-                            original.apply(console, args);
-                        };
-                    });
+                if (window.__consoleHistory) {
+                    return window.__consoleHistory.slice();
                 }
-
-                const logs = window.__consoleHistory.slice();
-                if (arguments[0] === true) {
-                    window.__consoleHistory = [];
-                }
-                return logs;
+                return [];
             })()
             """
 
-            result = self.tab.Runtime.evaluate(
-                expression=js_code.replace('arguments[0]', 'true' if clear else 'false'),
-                returnByValue=True
-            )
+            result = self.tab.Runtime.evaluate(expression=js_code, returnByValue=True)
+            js_logs = result.get('result', {}).get('value', [])
 
-            logs = result.get('result', {}).get('value', [])
+            # Combine both sources (CDP logs + JS interceptor logs)
+            all_logs = []
+
+            # Add CDP logs with unified format
+            for log in cdp_logs:
+                all_logs.append({
+                    "type": log.get("type", "log"),
+                    "message": log.get("message", log.get("text", "")),
+                    "timestamp": log.get("timestamp", ""),
+                    "source": log.get("source", "cdp"),
+                    "url": log.get("url", ""),
+                    "lineNumber": log.get("lineNumber", 0)
+                })
+
+            # Add JS interceptor logs
+            for log in js_logs:
+                all_logs.append({
+                    "type": log.get("type", "log"),
+                    "message": log.get("message", ""),
+                    "timestamp": log.get("timestamp", ""),
+                    "source": "js-interceptor"
+                })
+
+            # Sort by timestamp if available
+            try:
+                all_logs.sort(key=lambda x: x.get("timestamp", 0))
+            except:
+                pass  # If sorting fails, keep original order
+
+            # Clear logs if requested
+            if clear:
+                self.console_logs.clear()
+                # Clear JS interceptor logs
+                clear_js = """
+                (function() {
+                    if (window.__consoleHistory) {
+                        window.__consoleHistory = [];
+                    }
+                    return {cleared: true};
+                })()
+                """
+                self.tab.Runtime.evaluate(expression=clear_js, returnByValue=True)
 
             return {
                 "success": True,
-                "logs": logs,
-                "count": len(logs),
-                "cleared": clear
+                "logs": all_logs,
+                "count": len(all_logs),
+                "cdpCount": len(cdp_logs),
+                "jsInterceptorCount": len(js_logs),
+                "cleared": clear,
+                "tip": "CDP listeners capture logs in real-time. If you see empty results, check if console logs occurred after MCP connection."
             }
         except Exception as e:
-            raise RuntimeError(f"Failed to get console logs: {str(e)}")
+            return {
+                "success": False,
+                "error": str(e),
+                "message": f"Failed to get console logs: {str(e)}"
+            }
 
     async def inspect_element(self, selector: str) -> Dict[str, Any]:
         """Inspect an element (like DevTools inspector)"""
