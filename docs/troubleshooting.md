@@ -137,6 +137,96 @@ curl http://$(cat /etc/resolv.conf | grep nameserver | awk '{print $2}'):9222/js
 
 ---
 
+## Ошибка: "Connection reset by peer" (WSL)
+
+### Симптомы
+- `curl` возвращает ошибку или зависает
+- MCP сервер не может подключиться к браузеру на Windows
+- `netstat` показывает, что браузер слушает только на `127.0.0.1:9222`
+
+### Причина
+**Брандмауэр Windows блокирует соединения с WSL**, даже если проброс портов настроен.
+
+### Диагностика
+
+**1. Проверьте, что браузер слушает (в Windows PowerShell):**
+```powershell
+netstat -ano | findstr :9222
+```
+
+Должно быть:
+```
+TCP    127.0.0.1:9222         0.0.0.0:0              LISTENING       12345
+```
+
+**2. Проверьте проброс портов:**
+```powershell
+netsh interface portproxy show all
+```
+
+Должно быть:
+```
+0.0.0.0    9222    127.0.0.1    9222
+```
+
+**3. Тест без брандмауэра (временно!):**
+```powershell
+Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled False
+```
+
+Проверьте из WSL:
+```bash
+curl http://$(cat /etc/resolv.conf | grep nameserver | awk '{print $2}'):9222/json/version
+```
+
+Если **заработало** - проблема точно в брандмауэре!
+
+### Решение
+
+**1. Включите брандмауэр обратно:**
+```powershell
+Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled True
+```
+
+**2. Удалите старые правила:**
+```powershell
+Get-NetFirewallRule | Where-Object {$_.DisplayName -like "*9222*" -or $_.DisplayName -like "*Chrome*" -or $_.DisplayName -like "*Comet*"} | Remove-NetFirewallRule
+```
+
+**3. Создайте правильное правило:**
+```powershell
+New-NetFirewallRule `
+    -DisplayName "Comet CDP WSL Access" `
+    -Description "Allow WSL to access Comet Chrome DevTools Protocol on port 9222" `
+    -Direction Inbound `
+    -LocalPort 9222 `
+    -Protocol TCP `
+    -Action Allow `
+    -Profile Private,Domain,Public `
+    -Enabled True
+```
+
+**4. Проверьте правило:**
+```powershell
+Get-NetFirewallRule -DisplayName "Comet CDP WSL Access" | Format-List DisplayName, Enabled, Action, LocalPort
+```
+
+**5. Проверьте из WSL:**
+```bash
+curl http://$(cat /etc/resolv.conf | grep nameserver | awk '{print $2}'):9222/json/version
+```
+
+Должен вернуться JSON! ✅
+
+### Важные замечания
+
+- Chromium/Comet **НЕ поддерживает** bind на `0.0.0.0` - всегда слушает только localhost
+- Поэтому **обязательно нужен проброс портов** через `netsh interface portproxy`
+- Брандмауэр должен разрешать входящие соединения на порт 9222 от **любых адресов** (включая WSL подсеть `172.16.0.0/12`)
+- `server.py` автоматически определяет IP Windows хоста из `/etc/resolv.conf`
+
+---
+
 ## MCP сервер не отвечает
 
 ### Причины

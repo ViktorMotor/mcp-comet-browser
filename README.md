@@ -52,35 +52,94 @@ chromium --remote-debugging-port=9222
 
 ### 2.1. Настройка для WSL (Windows Subsystem for Linux)
 
-Если вы используете WSL и Claude Code запущен в Linux-окружении, необходимо настроить проброс портов:
+Если вы используете WSL и Claude Code запущен в Linux-окружении, необходимо настроить проброс портов и брандмауэр:
 
-**Шаг 1: Настройте брандмауэр Windows**
+**Шаг 1: Запустите браузер на Windows**
 
-В Windows PowerShell от администратора выполните:
-```powershell
-New-NetFirewallRule -DisplayName "Chrome Debug Port" -Direction Inbound -LocalPort 9222 -Protocol TCP -Action Allow
+```cmd
+"C:\Users\<USERNAME>\AppData\Local\Perplexity\Comet\Application\Comet.exe" --remote-debugging-port=9222
 ```
+
+**Важно:** Chromium/Comet по умолчанию слушает только на `127.0.0.1` (localhost), поэтому нужен проброс портов для доступа из WSL.
 
 **Шаг 2: Настройте проброс портов**
 
 В Windows PowerShell от администратора выполните:
 ```powershell
+# Добавить проброс портов (localhost Windows → WSL)
 netsh interface portproxy add v4tov4 listenport=9222 listenaddress=0.0.0.0 connectport=9222 connectaddress=127.0.0.1
-```
 
-Проверить настройку можно командой:
-```powershell
+# Проверить настройку
 netsh interface portproxy show all
 ```
 
-**Шаг 3: Проверка из WSL**
+Вы должны увидеть:
+```
+Listen on ipv4:             Connect to ipv4:
+Address         Port        Address         Port
+--------------- ----------  --------------- ----------
+0.0.0.0         9222        127.0.0.1       9222
+```
+
+**Шаг 3: Настройте брандмауэр Windows**
+
+```powershell
+# Удалить старые правила (если есть)
+Get-NetFirewallRule | Where-Object {$_.DisplayName -like "*9222*" -or $_.DisplayName -like "*Chrome Debug*"} | Remove-NetFirewallRule
+
+# Создать правило для WSL
+New-NetFirewallRule `
+    -DisplayName "Comet CDP WSL Access" `
+    -Description "Allow WSL to access Comet Chrome DevTools Protocol on port 9222" `
+    -Direction Inbound `
+    -LocalPort 9222 `
+    -Protocol TCP `
+    -Action Allow `
+    -Profile Private,Domain,Public `
+    -Enabled True
+
+# Проверить правило
+Get-NetFirewallRule -DisplayName "Comet CDP WSL Access" | Format-List DisplayName, Enabled, Action
+```
+
+**Шаг 4: Проверка из WSL**
 
 В WSL терминале выполните:
 ```bash
-curl http://$(cat /etc/resolv.conf | grep nameserver | awk '{print $2}'):9222/json/version
+# Получить IP Windows хоста
+WINDOWS_HOST=$(cat /etc/resolv.conf | grep nameserver | awk '{print $2}')
+echo "Windows host IP: $WINDOWS_HOST"
+
+# Проверить доступ к браузеру
+curl http://$WINDOWS_HOST:9222/json/version
 ```
 
-Должен вернуться JSON с информацией о браузере.
+Должен вернуться JSON с информацией о браузере:
+```json
+{
+  "Browser": "Chrome/140.x.x.x",
+  "Protocol-Version": "1.3",
+  ...
+}
+```
+
+**Если не работает:**
+
+1. Временно отключите брандмауэр для теста:
+   ```powershell
+   Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled False
+   ```
+
+2. Если curl заработал - значит проблема в правиле брандмауэра. Включите обратно и пересоздайте правило:
+   ```powershell
+   Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled True
+   ```
+
+3. Проверьте, что браузер слушает на порту:
+   ```powershell
+   netstat -ano | findstr :9222
+   ```
+   Должно быть: `TCP    127.0.0.1:9222  ...  LISTENING`
 
 **Примечание:** `server.py` автоматически определяет IP Windows хоста из `/etc/resolv.conf` и подключается к нему.
 
