@@ -31,6 +31,31 @@ class CometMCPServer:
         self.browser: Optional[pychrome.Browser] = None
         self.tab: Optional[pychrome.Tab] = None
 
+    async def ensure_connected(self):
+        """Ensure we have a valid connection to a browser tab"""
+        try:
+            # Test if current tab is still alive
+            if self.tab:
+                try:
+                    # Try a simple command to check if tab is responsive
+                    self.tab.Runtime.evaluate(expression="1+1")
+                    return True
+                except Exception as e:
+                    # Tab is dead, need to reconnect
+                    import sys
+                    print(f"Tab connection lost: {str(e)}, reconnecting...", file=sys.stderr)
+                    try:
+                        self.tab.stop()
+                    except:
+                        pass
+                    self.tab = None
+
+            # Reconnect to browser
+            await self.connect()
+            return True
+        except Exception as e:
+            raise ConnectionError(f"Failed to ensure connection: {str(e)}")
+
     async def connect(self):
         """Connect to the existing Comet browser instance"""
         try:
@@ -62,6 +87,7 @@ class CometMCPServer:
     async def open_url(self, url: str) -> Dict[str, Any]:
         """Open a URL in the browser"""
         try:
+            await self.ensure_connected()
             self.tab.Page.navigate(url=url, _timeout=30)
             # Wait for page load
             await asyncio.sleep(2)
@@ -72,6 +98,7 @@ class CometMCPServer:
     async def get_text(self, selector: str) -> Dict[str, Any]:
         """Get text content from elements matching CSS selector"""
         try:
+            await self.ensure_connected()
             # Get document root
             doc = self.tab.DOM.getDocument()
             root_node_id = doc['root']['nodeId']
@@ -104,6 +131,7 @@ class CometMCPServer:
     async def click(self, selector: str) -> Dict[str, Any]:
         """Click on an element matching CSS selector"""
         try:
+            await self.ensure_connected()
             js_code = f"""
             (function() {{
                 const el = document.querySelector('{selector}');
@@ -129,6 +157,7 @@ class CometMCPServer:
     async def screenshot(self, path: str = "./screenshot.png") -> Dict[str, Any]:
         """Take a screenshot of the current page"""
         try:
+            await self.ensure_connected()
             result = self.tab.Page.captureScreenshot(format='png')
             img_data = result.get('data', '')
 
@@ -143,6 +172,7 @@ class CometMCPServer:
     async def evaluate_js(self, code: str) -> Dict[str, Any]:
         """Execute JavaScript code and return the result"""
         try:
+            await self.ensure_connected()
             # Wrap code in IIFE if it doesn't already return
             if not code.strip().startswith('(function'):
                 code = f"(function() {{ {code} }})()"
@@ -161,6 +191,7 @@ class CometMCPServer:
     async def open_devtools(self) -> Dict[str, Any]:
         """Open DevTools (F12) in the browser"""
         try:
+            await self.ensure_connected()
             # Use the browser API to open DevTools window
             # This sends a command to open the DevTools UI
             js_code = """
@@ -195,6 +226,7 @@ class CometMCPServer:
     async def close_devtools(self) -> Dict[str, Any]:
         """Close DevTools in the browser"""
         try:
+            await self.ensure_connected()
             js_code = """
             (function() {
                 const event = new KeyboardEvent('keydown', {
@@ -218,6 +250,7 @@ class CometMCPServer:
     async def console_command(self, command: str) -> Dict[str, Any]:
         """Execute a command in the DevTools console"""
         try:
+            await self.ensure_connected()
             # Execute command in console context
             result = self.tab.Runtime.evaluate(
                 expression=command,
@@ -267,6 +300,7 @@ class CometMCPServer:
     async def get_console_logs(self, clear: bool = False) -> Dict[str, Any]:
         """Get console logs from the browser"""
         try:
+            await self.ensure_connected()
             # Execute JS to capture console history
             js_code = """
             (function() {
@@ -321,6 +355,7 @@ class CometMCPServer:
     async def inspect_element(self, selector: str) -> Dict[str, Any]:
         """Inspect an element (like DevTools inspector)"""
         try:
+            await self.ensure_connected()
             # Get document root
             doc = self.tab.DOM.getDocument()
             root_node_id = doc['root']['nodeId']
@@ -385,6 +420,7 @@ class CometMCPServer:
     async def get_network_activity(self) -> Dict[str, Any]:
         """Get network activity (like DevTools Network panel)"""
         try:
+            await self.ensure_connected()
             # Use JavaScript to access performance API
             js_code = """
             (function() {
