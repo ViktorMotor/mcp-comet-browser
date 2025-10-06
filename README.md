@@ -129,6 +129,14 @@ Claude Code автоматически выполнит все шаги уста
 
 ### Вариант 2: Ручная настройка через конфигурацию
 
+Клонируйте репозиторий:
+```bash
+cd ~
+git clone https://github.com/ViktorMotor/mcp-comet-browser.git
+cd mcp-comet-browser
+pip install -r requirements.txt
+```
+
 Добавьте в `~/.config/claude-code/mcp_settings.json` (Linux/macOS/WSL) или `%APPDATA%\Claude Code\mcp_settings.json` (Windows):
 
 ```json
@@ -137,14 +145,12 @@ Claude Code автоматически выполнит все шаги уста
     "comet-browser": {
       "command": "python3",
       "args": ["server.py"],
-      "cwd": "/home/ваш-пользователь/mcp-comet-browser",
+      "cwd": "~/mcp-comet-browser",
       "transport": "stdio"
     }
   }
 }
 ```
-
-**Важно:** Измените путь `cwd` на актуальный путь к клонированному репозиторию.
 
 ### Вариант 3: Использование mcp.json
 
