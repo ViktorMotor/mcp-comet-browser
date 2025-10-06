@@ -108,28 +108,49 @@ MCP Comet Browser - Environment Check
 
 ## Подключение к Claude Code
 
-### Вариант 1: Через файл конфигурации Claude Code
+### Вариант 1: Автоматическая установка (рекомендуется)
 
-Добавьте в `~/.config/claude/config.json` (Linux/macOS) или `%APPDATA%\Claude\config.json` (Windows):
+Скопируйте и отправьте Claude Code этот промпт:
+
+```
+Клонируй репозиторий https://github.com/ViktorMotor/mcp-comet-browser в ~/mcp-comet-browser,
+установи зависимости (pip install -r requirements.txt),
+добавь MCP-сервер в конфигурацию Claude Code,
+и проверь подключение запустив check_env.py.
+
+Используй python3 вместо python.
+Путь к конфигурации Claude Code: ~/.config/claude-code/mcp_settings.json (Linux/WSL)
+или %APPDATA%\Claude Code\mcp_settings.json (Windows).
+
+После настройки протестируй доступ к браузеру.
+```
+
+Claude Code автоматически выполнит все шаги установки и настройки.
+
+### Вариант 2: Ручная настройка через конфигурацию
+
+Добавьте в `~/.config/claude-code/mcp_settings.json` (Linux/macOS/WSL) или `%APPDATA%\Claude Code\mcp_settings.json` (Windows):
 
 ```json
 {
   "mcpServers": {
     "comet-browser": {
-      "command": "python",
+      "command": "python3",
       "args": ["server.py"],
-      "cwd": "/home/admsrv/mcp_comet_for_claude_code",
+      "cwd": "/home/ваш-пользователь/mcp-comet-browser",
       "transport": "stdio"
     }
   }
 }
 ```
 
-### Вариант 2: Использование mcp.json
+**Важно:** Измените путь `cwd` на актуальный путь к клонированному репозиторию.
+
+### Вариант 3: Использование mcp.json
 
 Скопируйте `mcp.json` в директорию конфигурации Claude Code или укажите путь к серверу вручную.
 
-### 3. Перезапустите Claude Code
+### Перезапуск Claude Code
 
 После добавления конфигурации перезапустите Claude Code для загрузки MCP-сервера.
 
