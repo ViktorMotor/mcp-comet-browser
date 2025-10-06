@@ -12,7 +12,7 @@ class EvaluateJsCommand(Command):
 
     @property
     def description(self) -> str:
-        return "Execute JavaScript code in the browser"
+        return "⚠️ NO OUTPUT visible. Use for actions only (e.g. clicks). For data: save_page_info() instead"
 
     @property
     def input_schema(self) -> Dict[str, Any]:

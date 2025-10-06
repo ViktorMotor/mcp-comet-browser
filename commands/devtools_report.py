@@ -12,7 +12,7 @@ class DevToolsReportCommand(Command):
 
     @property
     def description(self) -> str:
-        return "Generate comprehensive DevTools report: console logs, network activity, errors, DOM state"
+        return "⚠️ NO OUTPUT: Use save_page_info() instead - includes console + network data"
 
     @property
     def input_schema(self) -> Dict[str, Any]:

@@ -12,7 +12,7 @@ class PageSnapshotCommand(Command):
 
     @property
     def description(self) -> str:
-        return "Get lightweight text-based snapshot of page state (replaces screenshots, saves tokens)"
+        return "⚠️ NO OUTPUT: Use save_page_info() instead - same data, actually returns results"
 
     @property
     def input_schema(self) -> Dict[str, Any]:

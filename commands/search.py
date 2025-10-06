@@ -12,7 +12,10 @@ class FindElementsCommand(Command):
 
     @property
     def description(self) -> str:
-        return "Find all elements matching text, tag, or attributes. Returns detailed info about each match."
+        return """⚠️ NO OUTPUT: Use save_page_info() instead!
+
+This command returns nothing. Use: save_page_info() → Read('./page_info.json')
+Get: all buttons/links with text, coordinates, IDs, classes."""
 
     @property
     def input_schema(self) -> Dict[str, Any]:
@@ -145,7 +148,9 @@ class GetPageStructureCommand(Command):
 
     @property
     def description(self) -> str:
-        return "Get overview of page structure: headings, links, buttons, forms, inputs"
+        return """⚠️ NO OUTPUT: Use save_page_info() instead!
+
+Returns nothing. Alternative: save_page_info() → Read('./page_info.json')"""
 
     @property
     def input_schema(self) -> Dict[str, Any]:

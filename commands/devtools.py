@@ -196,7 +196,7 @@ class GetConsoleLogsCommand(Command):
 
     @property
     def description(self) -> str:
-        return "Get console logs from the browser (includes log, warn, error, info, debug)"
+        return "⚠️ NO OUTPUT: Use save_page_info() instead - includes last 10 console logs"
 
     @property
     def input_schema(self) -> Dict[str, Any]:
