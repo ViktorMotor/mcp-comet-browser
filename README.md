@@ -9,13 +9,22 @@ MCP (Model Context Protocol) сервер для управления брауз
 - **pychrome** — библиотека для взаимодействия с Chrome DevTools Protocol (CDP)
 - **Comet Browser** — запущен с флагом `--remote-debugging-port=9222`
 
-Сервер предоставляет 16 методов:
+Сервер предоставляет 17 методов:
 
-**Базовые:** `open_url`, `get_text`, `click`, `screenshot`, `evaluate_js`, `scroll_page`
+**Базовые:** `open_url`, `get_text`, `click`, `screenshot`, `evaluate_js`, `scroll_page`, `move_cursor`
 
 **DevTools:** `open_devtools`, `close_devtools`, `console_command`, `get_console_logs`, `inspect_element`, `get_network_activity`
 
 **Вкладки:** `list_tabs`, `create_tab`, `close_tab`, `switch_tab`
+
+## Визуализация курсора AI
+
+Сервер автоматически создаёт **визуальный курсор AI** (синий светящийся кружок), который показывает, куда смотрит модель:
+
+- При `click()` курсор **автоматически анимируется** к элементу перед кликом
+- Можно явно перемещать курсор командой `move_cursor()`
+- Курсор анимируется плавно с эффектом свечения
+- При клике меняет цвет на зелёный с анимацией
 
 Коммуникация через MCP позволяет Claude Code напрямую управлять браузером и использовать возможности DevTools.
 
@@ -365,6 +374,14 @@ python server.py
 
 ```
 Прокрути элемент .content вниз
+```
+
+```
+Перемести курсор к кнопке с классом .submit-button
+```
+
+```
+Перемести курсор на координаты (100, 200)
 ```
 
 **DevTools функционал:**

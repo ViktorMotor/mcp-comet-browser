@@ -184,6 +184,9 @@ class CometMCPServer:
             # Initialize JavaScript interceptor as backup
             await self._initialize_js_console_interceptor()
 
+            # Initialize AI cursor visualization
+            await self._initialize_ai_cursor()
+
             return True
         except Exception as e:
             raise ConnectionError(f"Failed to connect to browser on port {self.debug_port}: {str(e)}")
@@ -226,6 +229,99 @@ class CometMCPServer:
             return result.get('result', {}).get('value', {})
         except Exception as e:
             print(f"Failed to initialize JS console interceptor: {e}", file=sys.stderr)
+            return {"success": False, "error": str(e)}
+
+    async def _initialize_ai_cursor(self):
+        """Initialize visual AI cursor overlay"""
+        try:
+            js_code = """
+            (function() {
+                if (window.__aiCursorInitialized) {
+                    return {success: true, message: 'AI cursor already initialized'};
+                }
+
+                // Create cursor element
+                const cursor = document.createElement('div');
+                cursor.id = '__ai_cursor__';
+                cursor.style.cssText = `
+                    position: fixed;
+                    width: 24px;
+                    height: 24px;
+                    border-radius: 50%;
+                    background: radial-gradient(circle, rgba(59, 130, 246, 0.8) 0%, rgba(37, 99, 235, 0.6) 50%, rgba(29, 78, 216, 0.4) 100%);
+                    border: 2px solid rgba(59, 130, 246, 1);
+                    box-shadow: 0 0 20px rgba(59, 130, 246, 0.8), 0 0 40px rgba(59, 130, 246, 0.4);
+                    pointer-events: none;
+                    z-index: 2147483647;
+                    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                    display: none;
+                `;
+
+                // Add pulse animation
+                const style = document.createElement('style');
+                style.textContent = `
+                    @keyframes __ai_cursor_pulse__ {
+                        0%, 100% {
+                            transform: scale(1);
+                            opacity: 1;
+                        }
+                        50% {
+                            transform: scale(1.2);
+                            opacity: 0.8;
+                        }
+                    }
+                    @keyframes __ai_cursor_click__ {
+                        0% {
+                            transform: scale(1);
+                        }
+                        50% {
+                            transform: scale(0.8);
+                        }
+                        100% {
+                            transform: scale(1);
+                        }
+                    }
+                    #__ai_cursor__.clicking {
+                        animation: __ai_cursor_click__ 0.3s ease;
+                        background: radial-gradient(circle, rgba(34, 197, 94, 0.9) 0%, rgba(22, 163, 74, 0.7) 50%, rgba(21, 128, 61, 0.5) 100%);
+                        border-color: rgba(34, 197, 94, 1);
+                        box-shadow: 0 0 25px rgba(34, 197, 94, 0.9), 0 0 50px rgba(34, 197, 94, 0.5);
+                    }
+                `;
+
+                document.head.appendChild(style);
+                document.body.appendChild(cursor);
+
+                // Store cursor reference
+                window.__aiCursor__ = cursor;
+                window.__aiCursorInitialized = true;
+
+                // Helper function to move cursor
+                window.__moveAICursor__ = function(x, y, duration = 300) {
+                    cursor.style.display = 'block';
+                    cursor.style.left = (x - 12) + 'px';
+                    cursor.style.top = (y - 12) + 'px';
+                    cursor.style.transition = `all ${duration}ms cubic-bezier(0.4, 0, 0.2, 1)`;
+                };
+
+                // Helper function to show click animation
+                window.__clickAICursor__ = function() {
+                    cursor.classList.add('clicking');
+                    setTimeout(() => cursor.classList.remove('clicking'), 300);
+                };
+
+                // Helper function to hide cursor
+                window.__hideAICursor__ = function() {
+                    cursor.style.display = 'none';
+                };
+
+                return {success: true, message: 'AI cursor initialized'};
+            })()
+            """
+            result = self.tab.Runtime.evaluate(expression=js_code, returnByValue=True)
+            return result.get('result', {}).get('value', {})
+        except Exception as e:
+            print(f"Failed to initialize AI cursor: {e}", file=sys.stderr)
             return {"success": False, "error": str(e)}
 
     async def open_url(self, url: str) -> Dict[str, Any]:
@@ -272,11 +368,11 @@ class CometMCPServer:
         except Exception as e:
             raise RuntimeError(f"Failed to get text: {str(e)}")
 
-    async def click(self, selector: str) -> Dict[str, Any]:
-        """Click on an element matching CSS selector"""
+    async def click(self, selector: str, show_cursor: bool = True) -> Dict[str, Any]:
+        """Click on an element matching CSS selector with optional cursor animation"""
         try:
             await self.ensure_connected()
-            # Enhanced click with detailed diagnostics
+            # Enhanced click with cursor animation and detailed diagnostics
             js_code = f"""
             (function() {{
                 const el = document.querySelector('{selector}');
@@ -320,44 +416,68 @@ class CometMCPServer:
                                   rect.bottom <= window.innerHeight &&
                                   rect.right <= window.innerWidth;
 
-                // Try to click
-                try {{
-                    el.click();
-                    return {{
-                        success: true,
-                        selector: '{selector}',
-                        message: 'Clicked element: {selector}',
-                        elementInfo: {{
-                            tagName: el.tagName,
-                            id: el.id,
-                            className: el.className,
-                            text: el.textContent.trim().substring(0, 100),
-                            position: {{
-                                top: rect.top,
-                                left: rect.left,
-                                width: rect.width,
-                                height: rect.height
-                            }},
-                            inViewport: inViewport
-                        }}
-                    }};
-                }} catch (clickError) {{
-                    return {{
-                        success: false,
-                        reason: 'click_failed',
-                        message: 'Click failed: ' + clickError.message,
-                        error: clickError.toString()
-                    }};
+                // Calculate click position (center of element)
+                const clickX = rect.left + rect.width / 2;
+                const clickY = rect.top + rect.height / 2;
+
+                // Animate cursor to element if requested
+                const showCursor = {str(show_cursor).lower()};
+                if (showCursor && window.__moveAICursor__) {{
+                    window.__moveAICursor__(clickX, clickY, 400);
                 }}
+
+                // Wait for cursor animation, then click
+                return new Promise((resolve) => {{
+                    setTimeout(() => {{
+                        try {{
+                            // Show click animation
+                            if (showCursor && window.__clickAICursor__) {{
+                                window.__clickAICursor__();
+                            }}
+
+                            // Perform the click
+                            el.click();
+
+                            resolve({{
+                                success: true,
+                                selector: '{selector}',
+                                message: 'Clicked element: {selector}',
+                                cursorAnimated: showCursor,
+                                elementInfo: {{
+                                    tagName: el.tagName,
+                                    id: el.id,
+                                    className: el.className,
+                                    text: el.textContent.trim().substring(0, 100),
+                                    position: {{
+                                        top: rect.top,
+                                        left: rect.left,
+                                        width: rect.width,
+                                        height: rect.height,
+                                        clickX: clickX,
+                                        clickY: clickY
+                                    }},
+                                    inViewport: inViewport
+                                }}
+                            }});
+                        }} catch (clickError) {{
+                            resolve({{
+                                success: false,
+                                reason: 'click_failed',
+                                message: 'Click failed: ' + clickError.message,
+                                error: clickError.toString()
+                            }});
+                        }}
+                    }}, showCursor ? 450 : 0);
+                }});
             }})()
             """
 
-            result = self.tab.Runtime.evaluate(expression=js_code, returnByValue=True)
+            result = self.tab.Runtime.evaluate(expression=js_code, returnByValue=True, awaitPromise=True)
             click_result = result.get('result', {}).get('value', {})
 
             # Return the detailed result
             if click_result.get('success'):
-                await asyncio.sleep(0.5)  # Brief wait after click
+                await asyncio.sleep(0.3)  # Brief wait after click
 
             return click_result
         except Exception as e:
@@ -365,6 +485,93 @@ class CometMCPServer:
                 "success": False,
                 "reason": "exception",
                 "message": f"Failed to click element: {str(e)}",
+                "error": str(e)
+            }
+
+    async def move_cursor(self, x: int = None, y: int = None, selector: str = None, duration: int = 400) -> Dict[str, Any]:
+        """Move the AI cursor to coordinates or element center"""
+        try:
+            await self.ensure_connected()
+
+            if selector:
+                # Move to element center
+                js_code = f"""
+                (function() {{
+                    const el = document.querySelector('{selector}');
+                    if (!el) {{
+                        return {{
+                            success: false,
+                            message: 'Element not found: {selector}'
+                        }};
+                    }}
+
+                    const rect = el.getBoundingClientRect();
+                    const centerX = rect.left + rect.width / 2;
+                    const centerY = rect.top + rect.height / 2;
+
+                    if (window.__moveAICursor__) {{
+                        window.__moveAICursor__(centerX, centerY, {duration});
+                        return {{
+                            success: true,
+                            message: 'Cursor moved to element: {selector}',
+                            position: {{
+                                x: centerX,
+                                y: centerY
+                            }},
+                            element: {{
+                                tagName: el.tagName,
+                                id: el.id,
+                                className: el.className,
+                                bounds: {{
+                                    top: rect.top,
+                                    left: rect.left,
+                                    width: rect.width,
+                                    height: rect.height
+                                }}
+                            }}
+                        }};
+                    }} else {{
+                        return {{
+                            success: false,
+                            message: 'AI cursor not initialized'
+                        }};
+                    }}
+                }})()
+                """
+            elif x is not None and y is not None:
+                # Move to specific coordinates
+                js_code = f"""
+                (function() {{
+                    if (window.__moveAICursor__) {{
+                        window.__moveAICursor__({x}, {y}, {duration});
+                        return {{
+                            success: true,
+                            message: 'Cursor moved to coordinates',
+                            position: {{
+                                x: {x},
+                                y: {y}
+                            }}
+                        }};
+                    }} else {{
+                        return {{
+                            success: false,
+                            message: 'AI cursor not initialized'
+                        }};
+                    }}
+                }})()
+                """
+            else:
+                return {
+                    "success": False,
+                    "message": "Either provide x,y coordinates or selector"
+                }
+
+            result = self.tab.Runtime.evaluate(expression=js_code, returnByValue=True)
+            return result.get('result', {}).get('value', {})
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Failed to move cursor: {str(e)}",
                 "error": str(e)
             }
 
@@ -1190,6 +1397,19 @@ class MCPJSONRPCServer:
                             "selector": {"type": "string", "description": "CSS selector of element to scroll (scrolls page if omitted)"}
                         }
                     }
+                },
+                {
+                    "name": "move_cursor",
+                    "description": "Move the visual AI cursor to specific coordinates or element center. Useful for showing where the AI is focusing attention.",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "x": {"type": "integer", "description": "X coordinate to move cursor to"},
+                            "y": {"type": "integer", "description": "Y coordinate to move cursor to"},
+                            "selector": {"type": "string", "description": "CSS selector of element to move cursor to (center of element)"},
+                            "duration": {"type": "integer", "description": "Animation duration in milliseconds (default: 400)", "default": 400}
+                        }
+                    }
                 }
             ]
         }
@@ -1237,6 +1457,12 @@ class MCPJSONRPCServer:
             y = arguments.get('y')
             selector = arguments.get('selector')
             return await self.comet.scroll_page(direction, amount, x, y, selector)
+        elif tool_name == 'move_cursor':
+            x = arguments.get('x')
+            y = arguments.get('y')
+            selector = arguments.get('selector')
+            duration = arguments.get('duration', 400)
+            return await self.comet.move_cursor(x, y, selector, duration)
         else:
             raise ValueError(f"Unknown tool: {tool_name}")
 
