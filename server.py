@@ -457,6 +457,126 @@ class CometMCPServer:
         except Exception as e:
             raise RuntimeError(f"Failed to get network activity: {str(e)}")
 
+    async def list_tabs(self) -> Dict[str, Any]:
+        """List all open tabs in the browser"""
+        try:
+            tabs = self.browser.list_tab()
+
+            tabs_info = []
+            for tab in tabs:
+                tabs_info.append({
+                    "id": tab.id,
+                    "url": tab.url,
+                    "title": tab.title,
+                    "type": tab.type
+                })
+
+            return {
+                "success": True,
+                "tabs": tabs_info,
+                "count": len(tabs_info),
+                "currentTabId": self.tab.id if self.tab else None
+            }
+        except Exception as e:
+            raise RuntimeError(f"Failed to list tabs: {str(e)}")
+
+    async def create_tab(self, url: str = None) -> Dict[str, Any]:
+        """Create a new tab and optionally navigate to URL"""
+        try:
+            new_tab = self.browser.new_tab(url=url)
+
+            return {
+                "success": True,
+                "tabId": new_tab.id,
+                "url": url or "about:blank",
+                "message": f"Created new tab{' and opened ' + url if url else ''}"
+            }
+        except Exception as e:
+            raise RuntimeError(f"Failed to create tab: {str(e)}")
+
+    async def close_tab(self, tab_id: str = None) -> Dict[str, Any]:
+        """Close a tab by ID (closes current tab if no ID provided)"""
+        try:
+            if tab_id is None:
+                # Close current tab
+                if self.tab:
+                    tab_id = self.tab.id
+                else:
+                    return {"success": False, "message": "No current tab to close"}
+
+            # Find tab by ID
+            tabs = self.browser.list_tab()
+            tab_to_close = None
+            for tab in tabs:
+                if tab.id == tab_id:
+                    tab_to_close = tab
+                    break
+
+            if not tab_to_close:
+                return {"success": False, "message": f"Tab not found: {tab_id}"}
+
+            # Close the tab
+            self.browser.close_tab(tab_to_close)
+
+            # If we closed the current tab, clear reference
+            if self.tab and self.tab.id == tab_id:
+                try:
+                    self.tab.stop()
+                except:
+                    pass
+                self.tab = None
+
+            return {
+                "success": True,
+                "tabId": tab_id,
+                "message": f"Closed tab: {tab_id}"
+            }
+        except Exception as e:
+            raise RuntimeError(f"Failed to close tab: {str(e)}")
+
+    async def switch_tab(self, tab_id: str) -> Dict[str, Any]:
+        """Switch to a different tab by ID"""
+        try:
+            # Find tab by ID
+            tabs = self.browser.list_tab()
+            target_tab = None
+            for tab in tabs:
+                if tab.id == tab_id:
+                    target_tab = tab
+                    break
+
+            if not target_tab:
+                return {"success": False, "message": f"Tab not found: {tab_id}"}
+
+            # Stop current tab
+            if self.tab:
+                try:
+                    self.tab.stop()
+                except:
+                    pass
+
+            # Switch to new tab
+            self.tab = target_tab
+            self.tab.start()
+
+            # Enable necessary domains
+            self.tab.Page.enable()
+            self.tab.DOM.enable()
+            self.tab.Runtime.enable()
+            self.tab.Console.enable()
+            self.tab.Network.enable()
+            self.tab.Debugger.enable()
+
+            return {
+                "success": True,
+                "tabId": tab_id,
+                "url": target_tab.url,
+                "title": target_tab.title,
+                "message": f"Switched to tab: {tab_id}"
+            }
+        except Exception as e:
+            raise RuntimeError(f"Failed to switch tab: {str(e)}")
+
     def close(self):
         """Close connection to browser"""
         try:
@@ -668,6 +788,45 @@ class MCPJSONRPCServer:
                         "type": "object",
                         "properties": {}
                     }
+                },
+                {
+                    "name": "list_tabs",
+                    "description": "List all open tabs in the browser",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {}
+                    }
+                },
+                {
+                    "name": "create_tab",
+                    "description": "Create a new tab and optionally navigate to a URL",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "url": {"type": "string", "description": "URL to open in new tab (optional)"}
+                        }
+                    }
+                },
+                {
+                    "name": "close_tab",
+                    "description": "Close a tab by ID (closes current tab if no ID provided)",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "tab_id": {"type": "string", "description": "Tab ID to close (optional, defaults to current tab)"}
+                        }
+                    }
+                },
+                {
+                    "name": "switch_tab",
+                    "description": "Switch to a different tab by ID",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "tab_id": {"type": "string", "description": "Tab ID to switch to"}
+                        },
+                        "required": ["tab_id"]
+                    }
                 }
             ]
         }
@@ -698,6 +857,16 @@ class MCPJSONRPCServer:
             return await self.comet.inspect_element(arguments['selector'])
         elif tool_name == 'get_network_activity':
             return await self.comet.get_network_activity()
+        elif tool_name == 'list_tabs':
+            return await self.comet.list_tabs()
+        elif tool_name == 'create_tab':
+            url = arguments.get('url')
+            return await self.comet.create_tab(url)
+        elif tool_name == 'close_tab':
+            tab_id = arguments.get('tab_id')
+            return await self.comet.close_tab(tab_id)
+        elif tool_name == 'switch_tab':
+            return await self.comet.switch_tab(arguments['tab_id'])
         else:
             raise ValueError(f"Unknown tool: {tool_name}")
 

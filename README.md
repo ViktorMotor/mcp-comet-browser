@@ -9,7 +9,14 @@ MCP (Model Context Protocol) сервер для управления брауз
 - **pychrome** — библиотека для взаимодействия с Chrome DevTools Protocol (CDP)
 - **Comet Browser** — запущен с флагом `--remote-debugging-port=9222`
 
-Сервер предоставляет 11 методов: `open_url`, `get_text`, `click`, `screenshot`, `evaluate_js`, `open_devtools`, `close_devtools`, `console_command`, `get_console_logs`, `inspect_element`, `get_network_activity`.
+Сервер предоставляет 15 методов:
+
+**Базовые:** `open_url`, `get_text`, `click`, `screenshot`, `evaluate_js`
+
+**DevTools:** `open_devtools`, `close_devtools`, `console_command`, `get_console_logs`, `inspect_element`, `get_network_activity`
+
+**Вкладки:** `list_tabs`, `create_tab`, `close_tab`, `switch_tab`
+
 Коммуникация через MCP позволяет Claude Code напрямую управлять браузером и использовать возможности DevTools.
 
 ## Требования
@@ -287,6 +294,26 @@ python server.py
 {"jsonrpc": "2.0", "id": 10, "method": "tools/call", "params": {"name": "get_network_activity", "arguments": {}}}
 ```
 
+**Получить список вкладок:**
+```json
+{"jsonrpc": "2.0", "id": 11, "method": "tools/call", "params": {"name": "list_tabs", "arguments": {}}}
+```
+
+**Создать новую вкладку:**
+```json
+{"jsonrpc": "2.0", "id": 12, "method": "tools/call", "params": {"name": "create_tab", "arguments": {"url": "https://google.com"}}}
+```
+
+**Переключиться на вкладку:**
+```json
+{"jsonrpc": "2.0", "id": 13, "method": "tools/call", "params": {"name": "switch_tab", "arguments": {"tab_id": "TAB_ID_HERE"}}}
+```
+
+**Закрыть вкладку:**
+```json
+{"jsonrpc": "2.0", "id": 14, "method": "tools/call", "params": {"name": "close_tab", "arguments": {"tab_id": "TAB_ID_HERE"}}}
+```
+
 ## Использование с Claude Code
 
 После подключения вы можете просить Claude:
@@ -331,6 +358,23 @@ python server.py
 
 ```
 Выполни в консоли: console.log("test") и затем получи логи
+```
+
+**Работа с вкладками:**
+```
+Покажи список открытых вкладок в браузере
+```
+
+```
+Создай новую вкладку и открой в ней https://github.com
+```
+
+```
+Переключись на вкладку с ID xxx
+```
+
+```
+Закрой текущую вкладку
 ```
 
 ## Устранение неполадок
