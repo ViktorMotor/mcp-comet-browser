@@ -464,18 +464,19 @@ class CometMCPServer:
 
             tabs_info = []
             for tab in tabs:
+                # Access tab properties as attributes
                 tabs_info.append({
-                    "id": tab.id,
-                    "url": tab.url,
-                    "title": tab.title,
-                    "type": tab.type
+                    "id": getattr(tab, 'id', 'unknown'),
+                    "url": getattr(tab, 'url', 'unknown'),
+                    "title": getattr(tab, 'title', 'untitled'),
+                    "type": getattr(tab, 'type', 'page')
                 })
 
             return {
                 "success": True,
                 "tabs": tabs_info,
                 "count": len(tabs_info),
-                "currentTabId": self.tab.id if self.tab else None
+                "currentTabId": getattr(self.tab, 'id', None) if self.tab else None
             }
         except Exception as e:
             raise RuntimeError(f"Failed to list tabs: {str(e)}")
@@ -487,7 +488,7 @@ class CometMCPServer:
 
             return {
                 "success": True,
-                "tabId": new_tab.id,
+                "tabId": getattr(new_tab, 'id', 'unknown'),
                 "url": url or "about:blank",
                 "message": f"Created new tab{' and opened ' + url if url else ''}"
             }
@@ -500,7 +501,9 @@ class CometMCPServer:
             if tab_id is None:
                 # Close current tab
                 if self.tab:
-                    tab_id = self.tab.id
+                    tab_id = getattr(self.tab, 'id', None)
+                    if not tab_id:
+                        return {"success": False, "message": "Current tab has no ID"}
                 else:
                     return {"success": False, "message": "No current tab to close"}
 
@@ -508,7 +511,7 @@ class CometMCPServer:
             tabs = self.browser.list_tab()
             tab_to_close = None
             for tab in tabs:
-                if tab.id == tab_id:
+                if getattr(tab, 'id', None) == tab_id:
                     tab_to_close = tab
                     break
 
@@ -519,7 +522,7 @@ class CometMCPServer:
             self.browser.close_tab(tab_to_close)
 
             # If we closed the current tab, clear reference
-            if self.tab and self.tab.id == tab_id:
+            if self.tab and getattr(self.tab, 'id', None) == tab_id:
                 try:
                     self.tab.stop()
                 except:
@@ -541,7 +544,7 @@ class CometMCPServer:
             tabs = self.browser.list_tab()
             target_tab = None
             for tab in tabs:
-                if tab.id == tab_id:
+                if getattr(tab, 'id', None) == tab_id:
                     target_tab = tab
                     break
 
@@ -570,8 +573,8 @@ class CometMCPServer:
             return {
                 "success": True,
                 "tabId": tab_id,
-                "url": target_tab.url,
-                "title": target_tab.title,
+                "url": getattr(target_tab, 'url', 'unknown'),
+                "title": getattr(target_tab, 'title', 'untitled'),
                 "message": f"Switched to tab: {tab_id}"
             }
         except Exception as e:
