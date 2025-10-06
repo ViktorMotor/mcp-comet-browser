@@ -20,6 +20,7 @@ from commands.diagnostics import (
 )
 from commands.open_devtools_url import OpenDevToolsUrlCommand
 from commands.devtools_report import DevToolsReportCommand
+from commands.page_snapshot import PageSnapshotCommand
 
 
 class MCPJSONRPCServer:
@@ -60,6 +61,7 @@ class MCPJSONRPCServer:
         # Evaluation and screenshot
         self.commands['evaluate_js'] = EvaluateJsCommand
         self.commands['screenshot'] = ScreenshotCommand
+        self.commands['get_page_snapshot'] = PageSnapshotCommand
 
         # Search and query
         self.commands['find_elements'] = FindElementsCommand
