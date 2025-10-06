@@ -1,0 +1,82 @@
+{
+  "mcpServers": {
+    "comet-browser": {
+      "command": "python",
+      "args": ["server.py"],
+      "cwd": "/home/admsrv/mcp_comet_for_claude_code",
+      "transport": "stdio",
+      "tools": [
+        {
+          "name": "open_url",
+          "description": "Open a URL in the Comet browser",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string",
+                "description": "The URL to open (must include http:// or https://)"
+              }
+            },
+            "required": ["url"]
+          }
+        },
+        {
+          "name": "get_text",
+          "description": "Get text content from elements matching a CSS selector",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "selector": {
+                "type": "string",
+                "description": "CSS selector to find elements (e.g., '.class', '#id', 'div > p')"
+              }
+            },
+            "required": ["selector"]
+          }
+        },
+        {
+          "name": "click",
+          "description": "Click on an element matching a CSS selector",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "selector": {
+                "type": "string",
+                "description": "CSS selector to find the element to click"
+              }
+            },
+            "required": ["selector"]
+          }
+        },
+        {
+          "name": "screenshot",
+          "description": "Take a screenshot of the current page",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string",
+                "description": "Path where to save the screenshot",
+                "default": "./screenshot.png"
+              }
+            }
+          }
+        },
+        {
+          "name": "evaluate_js",
+          "description": "Execute JavaScript code in the browser context and return the result",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "JavaScript code to execute (use 'return' to return a value)"
+              }
+            },
+            "required": ["code"]
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,116 @@
+[
+  {
+    "description": "Open a URL",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "open_url",
+        "arguments": {
+          "url": "https://example.com"
+        }
+      }
+    },
+    "expected_response": {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "result": {
+        "success": true,
+        "url": "https://example.com",
+        "message": "Opened https://example.com"
+      }
+    }
+  },
+  {
+    "description": "Get text from element",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 2,
+      "method": "tools/call",
+      "params": {
+        "name": "get_text",
+        "arguments": {
+          "selector": "h1"
+        }
+      }
+    },
+    "expected_response": {
+      "jsonrpc": "2.0",
+      "id": 2,
+      "result": {
+        "success": true,
+        "text": "Example Domain",
+        "selector": "h1"
+      }
+    }
+  },
+  {
+    "description": "Execute JavaScript",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 3,
+      "method": "tools/call",
+      "params": {
+        "name": "evaluate_js",
+        "arguments": {
+          "code": "return document.title"
+        }
+      }
+    },
+    "expected_response": {
+      "jsonrpc": "2.0",
+      "id": 3,
+      "result": {
+        "success": true,
+        "result": "Example Domain"
+      }
+    }
+  },
+  {
+    "description": "Take screenshot",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 4,
+      "method": "tools/call",
+      "params": {
+        "name": "screenshot",
+        "arguments": {
+          "path": "./test_screenshot.png"
+        }
+      }
+    },
+    "expected_response": {
+      "jsonrpc": "2.0",
+      "id": 4,
+      "result": {
+        "success": true,
+        "path": "./test_screenshot.png",
+        "message": "Screenshot saved to ./test_screenshot.png"
+      }
+    }
+  },
+  {
+    "description": "Click element",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 5,
+      "method": "tools/call",
+      "params": {
+        "name": "click",
+        "arguments": {
+          "selector": "a"
+        }
+      }
+    },
+    "expected_response": {
+      "jsonrpc": "2.0",
+      "id": 5,
+      "result": {
+        "success": true,
+        "selector": "a",
+        "message": "Clicked element: a"
+      }
+    }
+  }
+]
