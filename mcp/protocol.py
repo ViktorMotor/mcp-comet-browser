@@ -19,6 +19,7 @@ from commands.diagnostics import (
     EnableConsoleLoggingCommand, DiagnosePageCommand, GetClickableElementsCommand
 )
 from commands.open_devtools_url import OpenDevToolsUrlCommand
+from commands.devtools_report import DevToolsReportCommand
 
 
 class MCPJSONRPCServer:
@@ -73,6 +74,7 @@ class MCPJSONRPCServer:
         self.commands['diagnose_page'] = DiagnosePageCommand
         self.commands['get_clickable_elements'] = GetClickableElementsCommand
         self.commands['open_devtools_ui'] = OpenDevToolsUrlCommand
+        self.commands['devtools_report'] = DevToolsReportCommand
 
     async def initialize(self):
         """Initialize connection to browser"""
@@ -172,7 +174,7 @@ class MCPJSONRPCServer:
             arguments['cursor'] = self.connection.cursor
         elif tool_name == 'open_url':
             arguments['cursor'] = self.connection.cursor
-        elif tool_name == 'get_console_logs':
+        elif tool_name in ['get_console_logs', 'devtools_report']:
             arguments['console_logs'] = self.connection.console_logs
         elif tool_name == 'enable_console_logging':
             arguments['connection'] = self.connection
