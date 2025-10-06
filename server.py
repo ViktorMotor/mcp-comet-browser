@@ -646,7 +646,7 @@ class MCPJSONRPCServer:
                     "inputSchema": {
                         "type": "object",
                         "properties": {
-                            "clear": {"type": "boolean", "description": "Clear logs after retrieving", "default": false}
+                            "clear": {"type": "boolean", "description": "Clear logs after retrieving", "default": False}
                         }
                     }
                 },
