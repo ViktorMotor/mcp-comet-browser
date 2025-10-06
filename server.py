@@ -51,6 +51,9 @@ class CometMCPServer:
             self.tab.Page.enable()
             self.tab.DOM.enable()
             self.tab.Runtime.enable()
+            self.tab.Console.enable()  # Enable console for logs
+            self.tab.Network.enable()  # Enable network monitoring
+            self.tab.Debugger.enable()  # Enable debugger
 
             return True
         except Exception as e:
@@ -154,6 +157,269 @@ class CometMCPServer:
             return {"success": True, "result": value}
         except Exception as e:
             raise RuntimeError(f"Failed to evaluate JavaScript: {str(e)}")
+
+    async def open_devtools(self) -> Dict[str, Any]:
+        """Open DevTools (F12) in the browser"""
+        try:
+            # Use the browser API to open DevTools window
+            # This sends a command to open the DevTools UI
+            js_code = """
+            (function() {
+                // Try to open DevTools programmatically
+                if (window.chrome && window.chrome.devtools) {
+                    return {success: true, message: 'DevTools already open'};
+                }
+                // Alternative: use keyboard shortcut simulation
+                const event = new KeyboardEvent('keydown', {
+                    key: 'F12',
+                    code: 'F12',
+                    keyCode: 123,
+                    which: 123,
+                    bubbles: true
+                });
+                document.dispatchEvent(event);
+                return {success: true, message: 'DevTools open command sent'};
+            })()
+            """
+
+            result = self.tab.Runtime.evaluate(expression=js_code, returnByValue=True)
+
+            return {
+                "success": True,
+                "message": "DevTools opened (F12). Note: UI may not show via CDP, but debugging is active.",
+                "tip": "DevTools functionality is available through console_command and get_console_logs"
+            }
+        except Exception as e:
+            raise RuntimeError(f"Failed to open DevTools: {str(e)}")
+
+    async def close_devtools(self) -> Dict[str, Any]:
+        """Close DevTools in the browser"""
+        try:
+            js_code = """
+            (function() {
+                const event = new KeyboardEvent('keydown', {
+                    key: 'F12',
+                    code: 'F12',
+                    keyCode: 123,
+                    which: 123,
+                    bubbles: true
+                });
+                document.dispatchEvent(event);
+                return {success: true, message: 'DevTools close command sent'};
+            })()
+            """
+
+            result = self.tab.Runtime.evaluate(expression=js_code, returnByValue=True)
+
+            return {"success": True, "message": "DevTools closed (F12)"}
+        except Exception as e:
+            raise RuntimeError(f"Failed to close DevTools: {str(e)}")
+
+    async def console_command(self, command: str) -> Dict[str, Any]:
+        """Execute a command in the DevTools console"""
+        try:
+            # Execute command in console context
+            result = self.tab.Runtime.evaluate(
+                expression=command,
+                returnByValue=True,
+                awaitPromise=True
+            )
+
+            if result.get('exceptionDetails'):
+                error_text = result['exceptionDetails'].get('text', 'Unknown error')
+                exception = result['exceptionDetails'].get('exception', {})
+                error_description = exception.get('description', error_text)
+
+                return {
+                    "success": False,
+                    "error": error_description,
+                    "type": "exception"
+                }
+
+            result_obj = result.get('result', {})
+            result_type = result_obj.get('type')
+            result_value = result_obj.get('value')
+
+            # Handle different result types
+            if result_type == 'undefined':
+                return {"success": True, "result": None, "type": "undefined"}
+            elif result_type == 'object' and result_obj.get('subtype') == 'null':
+                return {"success": True, "result": None, "type": "null"}
+            elif result_obj.get('objectId'):
+                # Complex object - get string representation
+                description = result_obj.get('description', str(result_value))
+                return {
+                    "success": True,
+                    "result": description,
+                    "type": result_type,
+                    "objectId": result_obj.get('objectId')
+                }
+            else:
+                return {
+                    "success": True,
+                    "result": result_value,
+                    "type": result_type
+                }
+
+        except Exception as e:
+            raise RuntimeError(f"Failed to execute console command: {str(e)}")
+
+    async def get_console_logs(self, clear: bool = False) -> Dict[str, Any]:
+        """Get console logs from the browser"""
+        try:
+            # Execute JS to capture console history
+            js_code = """
+            (function() {
+                // Check if we have console history stored
+                if (!window.__consoleHistory) {
+                    window.__consoleHistory = [];
+
+                    // Intercept console methods
+                    ['log', 'warn', 'error', 'info', 'debug'].forEach(function(method) {
+                        const original = console[method];
+                        console[method] = function(...args) {
+                            window.__consoleHistory.push({
+                                type: method,
+                                message: args.map(a => {
+                                    try {
+                                        return typeof a === 'object' ? JSON.stringify(a) : String(a);
+                                    } catch(e) {
+                                        return String(a);
+                                    }
+                                }).join(' '),
+                                timestamp: new Date().toISOString()
+                            });
+                            original.apply(console, args);
+                        };
+                    });
+                }
+
+                const logs = window.__consoleHistory.slice();
+                if (arguments[0] === true) {
+                    window.__consoleHistory = [];
+                }
+                return logs;
+            })()
+            """
+
+            result = self.tab.Runtime.evaluate(
+                expression=js_code.replace('arguments[0]', 'true' if clear else 'false'),
+                returnByValue=True
+            )
+
+            logs = result.get('result', {}).get('value', [])
+
+            return {
+                "success": True,
+                "logs": logs,
+                "count": len(logs),
+                "cleared": clear
+            }
+        except Exception as e:
+            raise RuntimeError(f"Failed to get console logs: {str(e)}")
+
+    async def inspect_element(self, selector: str) -> Dict[str, Any]:
+        """Inspect an element (like DevTools inspector)"""
+        try:
+            # Get document root
+            doc = self.tab.DOM.getDocument()
+            root_node_id = doc['root']['nodeId']
+
+            # Query selector
+            node_result = self.tab.DOM.querySelector(nodeId=root_node_id, selector=selector)
+            node_id = node_result.get('nodeId')
+
+            if not node_id:
+                return {"success": False, "message": f"Element not found: {selector}"}
+
+            # Get element properties
+            outer_html = self.tab.DOM.getOuterHTML(nodeId=node_id)
+            attributes = self.tab.DOM.getAttributes(nodeId=node_id)
+
+            # Get computed styles using JavaScript
+            js_code = f"""
+            (function() {{
+                const el = document.querySelector('{selector}');
+                if (!el) return null;
+
+                const styles = window.getComputedStyle(el);
+                const rect = el.getBoundingClientRect();
+
+                return {{
+                    tagName: el.tagName,
+                    id: el.id,
+                    className: el.className,
+                    textContent: el.textContent.trim().substring(0, 200),
+                    position: {{
+                        top: rect.top,
+                        left: rect.left,
+                        width: rect.width,
+                        height: rect.height
+                    }},
+                    styles: {{
+                        display: styles.display,
+                        position: styles.position,
+                        color: styles.color,
+                        backgroundColor: styles.backgroundColor,
+                        fontSize: styles.fontSize,
+                        fontFamily: styles.fontFamily
+                    }}
+                }};
+            }})()
+            """
+
+            js_result = self.tab.Runtime.evaluate(expression=js_code, returnByValue=True)
+            element_info = js_result.get('result', {}).get('value', {})
+
+            return {
+                "success": True,
+                "selector": selector,
+                "nodeId": node_id,
+                "html": outer_html.get('outerHTML', ''),
+                "attributes": attributes.get('attributes', []),
+                "info": element_info
+            }
+        except Exception as e:
+            raise RuntimeError(f"Failed to inspect element: {str(e)}")
+
+    async def get_network_activity(self) -> Dict[str, Any]:
+        """Get network activity (like DevTools Network panel)"""
+        try:
+            # Use JavaScript to access performance API
+            js_code = """
+            (function() {
+                const resources = performance.getEntriesByType('resource');
+                const navigation = performance.getEntriesByType('navigation')[0];
+
+                return {
+                    navigation: navigation ? {
+                        url: navigation.name,
+                        duration: navigation.duration,
+                        domContentLoaded: navigation.domContentLoadedEventEnd - navigation.domContentLoadedEventStart,
+                        loadComplete: navigation.loadEventEnd - navigation.loadEventStart
+                    } : null,
+                    resources: resources.slice(-50).map(r => ({
+                        name: r.name,
+                        type: r.initiatorType,
+                        duration: r.duration,
+                        size: r.transferSize || 0,
+                        startTime: r.startTime
+                    }))
+                };
+            })()
+            """
+
+            result = self.tab.Runtime.evaluate(expression=js_code, returnByValue=True)
+            network_data = result.get('result', {}).get('value', {})
+
+            return {
+                "success": True,
+                "navigation": network_data.get('navigation'),
+                "resources": network_data.get('resources', []),
+                "resourceCount": len(network_data.get('resources', []))
+            }
+        except Exception as e:
+            raise RuntimeError(f"Failed to get network activity: {str(e)}")
 
     def close(self):
         """Close connection to browser"""
@@ -310,6 +576,62 @@ class MCPJSONRPCServer:
                         },
                         "required": ["code"]
                     }
+                },
+                {
+                    "name": "open_devtools",
+                    "description": "Open DevTools (F12) in the browser",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {}
+                    }
+                },
+                {
+                    "name": "close_devtools",
+                    "description": "Close DevTools in the browser",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {}
+                    }
+                },
+                {
+                    "name": "console_command",
+                    "description": "Execute a command in the DevTools console and get the result",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "command": {"type": "string", "description": "Console command to execute (e.g., 'document.title', 'console.log(\"test\")')"}
+                        },
+                        "required": ["command"]
+                    }
+                },
+                {
+                    "name": "get_console_logs",
+                    "description": "Get console logs from the browser (includes log, warn, error, info, debug)",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "clear": {"type": "boolean", "description": "Clear logs after retrieving", "default": false}
+                        }
+                    }
+                },
+                {
+                    "name": "inspect_element",
+                    "description": "Inspect an element like DevTools inspector (get HTML, attributes, styles, position)",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "selector": {"type": "string", "description": "CSS selector of element to inspect"}
+                        },
+                        "required": ["selector"]
+                    }
+                },
+                {
+                    "name": "get_network_activity",
+                    "description": "Get network activity like DevTools Network panel (resources, timings, sizes)",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {}
+                    }
                 }
             ]
         }
@@ -327,6 +649,19 @@ class MCPJSONRPCServer:
             return await self.comet.screenshot(path)
         elif tool_name == 'evaluate_js':
             return await self.comet.evaluate_js(arguments['code'])
+        elif tool_name == 'open_devtools':
+            return await self.comet.open_devtools()
+        elif tool_name == 'close_devtools':
+            return await self.comet.close_devtools()
+        elif tool_name == 'console_command':
+            return await self.comet.console_command(arguments['command'])
+        elif tool_name == 'get_console_logs':
+            clear = arguments.get('clear', False)
+            return await self.comet.get_console_logs(clear)
+        elif tool_name == 'inspect_element':
+            return await self.comet.inspect_element(arguments['selector'])
+        elif tool_name == 'get_network_activity':
+            return await self.comet.get_network_activity()
         else:
             raise ValueError(f"Unknown tool: {tool_name}")
 

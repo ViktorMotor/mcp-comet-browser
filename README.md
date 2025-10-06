@@ -9,8 +9,8 @@ MCP (Model Context Protocol) сервер для управления брауз
 - **pychrome** — библиотека для взаимодействия с Chrome DevTools Protocol (CDP)
 - **Comet Browser** — запущен с флагом `--remote-debugging-port=9222`
 
-Сервер предоставляет 5 методов: `open_url`, `get_text`, `click`, `screenshot`, `evaluate_js`.
-Коммуникация через MCP позволяет Claude Code напрямую управлять браузером.
+Сервер предоставляет 11 методов: `open_url`, `get_text`, `click`, `screenshot`, `evaluate_js`, `open_devtools`, `close_devtools`, `console_command`, `get_console_logs`, `inspect_element`, `get_network_activity`.
+Коммуникация через MCP позволяет Claude Code напрямую управлять браузером и использовать возможности DevTools.
 
 ## Требования
 
@@ -203,10 +203,36 @@ python server.py
 {"jsonrpc": "2.0", "id": 5, "method": "tools/call", "params": {"name": "click", "arguments": {"selector": "a"}}}
 ```
 
+**Открыть DevTools:**
+```json
+{"jsonrpc": "2.0", "id": 6, "method": "tools/call", "params": {"name": "open_devtools", "arguments": {}}}
+```
+
+**Выполнить команду в консоли:**
+```json
+{"jsonrpc": "2.0", "id": 7, "method": "tools/call", "params": {"name": "console_command", "arguments": {"command": "document.querySelectorAll('a').length"}}}
+```
+
+**Получить логи консоли:**
+```json
+{"jsonrpc": "2.0", "id": 8, "method": "tools/call", "params": {"name": "get_console_logs", "arguments": {"clear": false}}}
+```
+
+**Инспектировать элемент:**
+```json
+{"jsonrpc": "2.0", "id": 9, "method": "tools/call", "params": {"name": "inspect_element", "arguments": {"selector": "h1"}}}
+```
+
+**Получить сетевую активность:**
+```json
+{"jsonrpc": "2.0", "id": 10, "method": "tools/call", "params": {"name": "get_network_activity", "arguments": {}}}
+```
+
 ## Использование с Claude Code
 
 После подключения вы можете просить Claude:
 
+**Базовые операции:**
 ```
 Открой https://example.com в браузере
 ```
@@ -221,6 +247,31 @@ python server.py
 
 ```
 Выполни JavaScript: return document.querySelectorAll('a').length
+```
+
+**DevTools функционал:**
+```
+Открой DevTools (F12) в браузере
+```
+
+```
+Выполни в консоли команду: document.title
+```
+
+```
+Получи все логи из консоли браузера
+```
+
+```
+Инспектируй элемент h1 на странице (покажи HTML, стили, позицию)
+```
+
+```
+Покажи сетевую активность страницы (загруженные ресурсы, тайминги)
+```
+
+```
+Выполни в консоли: console.log("test") и затем получи логи
 ```
 
 ## Устранение неполадок
