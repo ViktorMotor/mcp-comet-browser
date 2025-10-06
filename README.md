@@ -276,22 +276,33 @@ python server.py
 
 ## Устранение неполадок
 
+**Полное руководство:** См. [docs/troubleshooting.md](docs/troubleshooting.md)
+
+### Быстрые решения
+
+**Ошибка: "Tab has been stopped"**
+- Обновите сервер: `cd ~/mcp-comet-browser && git pull`
+- Перезапустите Claude Code
+- Сервер теперь автоматически переподключается к браузеру
+
 **Ошибка: "Failed to connect to browser on port 9222"**
 - Убедитесь, что Comet запущен с флагом `--remote-debugging-port=9222`
-- Проверьте, что порт не занят другим процессом: `lsof -i :9222` (Linux/macOS) или `netstat -ano | findstr :9222` (Windows)
+- Проверьте порт: `lsof -i :9222` (Linux/macOS) или `netstat -ano | findstr :9222` (Windows)
 - Для WSL: убедитесь, что настроены брандмауэр и проброс портов (см. раздел "Настройка для WSL")
 
-**Ошибка: "pychrome is NOT installed"**
-- Установите: `pip install pychrome`
+**DevTools команды не работают?**
+- Обновите сервер: `git pull`
+- Перезапустите Claude Code
+- Проверьте: должно быть 11 команд (включая 6 DevTools)
 
-**Ошибка: "Python version too old"**
-- Обновите Python до версии 3.10 или выше
+**Обновление MCP сервера:**
+```bash
+cd ~/mcp-comet-browser
+git pull
+# Перезапустите Claude Code
+```
 
-**WSL: Connection timeout при подключении к браузеру**
-- Проверьте, что браузер слушает на порту: `netstat -ano | findstr :9222` (в Windows)
-- Убедитесь, что правило брандмауэра создано
-- Проверьте проброс портов: `netsh interface portproxy show all` (в Windows PowerShell)
-- Попробуйте перезапустить браузер после настройки проброса портов
+Подробнее: [docs/troubleshooting.md](docs/troubleshooting.md)
 
 ## Структура проекта
 
