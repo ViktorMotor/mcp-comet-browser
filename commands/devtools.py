@@ -196,7 +196,10 @@ class GetConsoleLogsCommand(Command):
 
     @property
     def description(self) -> str:
-        return "⚠️ NO OUTPUT: Use save_page_info() instead - includes last 10 console logs"
+        return """Get console logs from the browser.
+
+Auto-redirects to save_page_info() due to Claude Code output limitations.
+After calling this, use Read('./page_info.json') to see console logs."""
 
     @property
     def input_schema(self) -> Dict[str, Any]:
@@ -208,80 +211,96 @@ class GetConsoleLogsCommand(Command):
         }
 
     async def execute(self, clear: bool = False, console_logs=None) -> Dict[str, Any]:
-        """Get console logs from CDP and JS interceptor"""
-        try:
-            # Get logs from CDP listeners
-            cdp_logs = console_logs.copy() if console_logs else []
+        """Auto-redirect to save_page_info (workaround for MCP output issue)"""
+        import json
+        import os
 
-            # Get logs from JS interceptor
+        try:
+            # Call save_page_info logic inline
             js_code = """
             (function() {
-                if (window.__consoleHistory) {
-                    return window.__consoleHistory.slice();
-                }
-                return [];
+                // Get all interactive elements
+                const selector = 'button, a, input, select, textarea, [role="button"], [role="tab"], [onclick]';
+                const elements = Array.from(document.querySelectorAll(selector));
+
+                const interactive = elements
+                    .filter(el => {
+                        const rect = el.getBoundingClientRect();
+                        const style = window.getComputedStyle(el);
+                        return rect.width > 0 && rect.height > 0 &&
+                               el.offsetParent !== null &&
+                               style.visibility !== 'hidden';
+                    })
+                    .map(el => {
+                        const rect = el.getBoundingClientRect();
+                        return {
+                            tag: el.tagName.toLowerCase(),
+                            type: el.type || el.getAttribute('role') || 'unknown',
+                            text: el.textContent.trim().substring(0, 100),
+                            id: el.id || null,
+                            className: el.className || null,
+                            position: {
+                                x: Math.round(rect.left + rect.width/2),
+                                y: Math.round(rect.top + rect.height/2),
+                                width: Math.round(rect.width),
+                                height: Math.round(rect.height)
+                            }
+                        };
+                    });
+
+                // Get console logs
+                const consoleLogs = window.__consoleHistory || [];
+
+                // Get network info
+                const networkEntries = performance.getEntriesByType('resource') || [];
+
+                return {
+                    url: window.location.href,
+                    title: document.title,
+                    interactive_elements: interactive,
+                    console: {
+                        logs: consoleLogs.slice(-10),
+                        total: consoleLogs.length
+                    },
+                    network: {
+                        total_requests: networkEntries.length,
+                        failed: networkEntries.filter(e => e.transferSize === 0).length
+                    },
+                    summary: {
+                        total_interactive: interactive.length,
+                        buttons: interactive.filter(e => e.tag === 'button').length,
+                        links: interactive.filter(e => e.tag === 'a').length
+                    }
+                };
             })()
             """
+
             result = self.tab.Runtime.evaluate(expression=js_code, returnByValue=True)
-            js_logs = result.get('result', {}).get('value', [])
+            page_data = result.get('result', {}).get('value', {})
 
-            # Combine sources
-            all_logs = []
-
-            # Add CDP logs with unified format
-            for log in cdp_logs:
-                all_logs.append({
-                    "type": log.get("type", "log"),
-                    "message": log.get("message", log.get("text", "")),
-                    "timestamp": log.get("timestamp", ""),
-                    "source": log.get("source", "cdp"),
-                    "url": log.get("url", ""),
-                    "lineNumber": log.get("lineNumber", 0)
-                })
-
-            # Add JS interceptor logs
-            for log in js_logs:
-                all_logs.append({
-                    "type": log.get("type", "log"),
-                    "message": log.get("message", ""),
-                    "timestamp": log.get("timestamp", ""),
-                    "source": "js-interceptor"
-                })
-
-            # Sort by timestamp
-            try:
-                all_logs.sort(key=lambda x: x.get("timestamp", 0))
-            except:
-                pass
-
-            # Clear logs if requested
-            if clear:
-                if console_logs:
-                    console_logs.clear()
-                clear_js = """
-                (function() {
-                    if (window.__consoleHistory) {
-                        window.__consoleHistory = [];
-                    }
-                    return {cleared: true};
-                })()
-                """
-                self.tab.Runtime.evaluate(expression=clear_js, returnByValue=True)
+            # Save to file
+            output_file = "./page_info.json"
+            os.makedirs(os.path.dirname(os.path.abspath(output_file)), exist_ok=True)
+            with open(output_file, 'w', encoding='utf-8') as f:
+                json.dump(page_data, f, indent=2, ensure_ascii=False)
 
             return {
                 "success": True,
-                "logs": all_logs,
-                "count": len(all_logs),
-                "cdpCount": len(cdp_logs),
-                "jsInterceptorCount": len(js_logs),
-                "cleared": clear,
-                "tip": "CDP listeners capture logs in real-time. If you see empty results, check if console logs occurred after MCP connection."
+                "message": f"✅ Data saved to {output_file}",
+                "instruction": "Use Read('./page_info.json') to see console logs and page data",
+                "redirect_reason": "get_console_logs returns no visible output in Claude Code",
+                "data_preview": {
+                    "console_logs": len(page_data.get('console', {}).get('logs', [])),
+                    "total_elements": len(page_data.get('interactive_elements', [])),
+                    "file_path": output_file
+                }
             }
+
         except Exception as e:
             return {
                 "success": False,
                 "error": str(e),
-                "message": f"Failed to get console logs: {str(e)}"
+                "message": f"Failed to save page info: {str(e)}"
             }
 
 

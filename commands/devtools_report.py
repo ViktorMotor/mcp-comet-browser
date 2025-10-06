@@ -12,7 +12,10 @@ class DevToolsReportCommand(Command):
 
     @property
     def description(self) -> str:
-        return "⚠️ NO OUTPUT: Use save_page_info() instead - includes console + network data"
+        return """Generate comprehensive DevTools debugging report.
+
+Auto-redirects to save_page_info() due to Claude Code output limitations.
+After calling this, use Read('./page_info.json') to see full report."""
 
     @property
     def input_schema(self) -> Dict[str, Any]:
@@ -24,162 +27,97 @@ class DevToolsReportCommand(Command):
         }
 
     async def execute(self, include_dom: bool = False, console_logs=None) -> Dict[str, Any]:
-        """Generate full DevTools report"""
+        """Auto-redirect to save_page_info (workaround for MCP output issue)"""
+        import json
+        import os
         try:
-            report = {
-                "success": True,
-                "timestamp": "",
-                "console": [],
-                "errors": [],
-                "warnings": [],
-                "network": {},
-                "page_info": {},
-                "dom": None
-            }
-
-            # Get page info
-            page_info_js = """
+            # Call save_page_info logic inline
+            js_code = """
             (function() {
+                // Get all interactive elements
+                const selector = 'button, a, input, select, textarea, [role="button"], [role="tab"], [onclick]';
+                const elements = Array.from(document.querySelectorAll(selector));
+
+                const interactive = elements
+                    .filter(el => {
+                        const rect = el.getBoundingClientRect();
+                        const style = window.getComputedStyle(el);
+                        return rect.width > 0 && rect.height > 0 &&
+                               el.offsetParent !== null &&
+                               style.visibility !== 'hidden';
+                    })
+                    .map(el => {
+                        const rect = el.getBoundingClientRect();
+                        return {
+                            tag: el.tagName.toLowerCase(),
+                            type: el.type || el.getAttribute('role') || 'unknown',
+                            text: el.textContent.trim().substring(0, 100),
+                            id: el.id || null,
+                            className: el.className || null,
+                            position: {
+                                x: Math.round(rect.left + rect.width/2),
+                                y: Math.round(rect.top + rect.height/2),
+                                width: Math.round(rect.width),
+                                height: Math.round(rect.height)
+                            }
+                        };
+                    });
+
+                // Get console logs
+                const consoleLogs = window.__consoleHistory || [];
+
+                // Get network info
+                const networkEntries = performance.getEntriesByType('resource') || [];
+
                 return {
                     url: window.location.href,
                     title: document.title,
-                    readyState: document.readyState,
-                    protocol: window.location.protocol,
-                    host: window.location.host,
-                    pathname: window.location.pathname,
-                    userAgent: navigator.userAgent,
-                    viewport: {
-                        width: window.innerWidth,
-                        height: window.innerHeight
+                    interactive_elements: interactive,
+                    console: {
+                        logs: consoleLogs.slice(-10),
+                        total: consoleLogs.length
                     },
-                    performance: window.performance ? {
-                        loaded: performance.timing.loadEventEnd > 0,
-                        domReady: performance.timing.domContentLoadedEventEnd > 0,
-                        navigationStart: performance.timing.navigationStart,
-                        loadComplete: performance.timing.loadEventEnd
-                    } : null
-                };
-            })()
-            """
-            page_result = self.tab.Runtime.evaluate(expression=page_info_js, returnByValue=True)
-            report['page_info'] = page_result.get('result', {}).get('value', {})
-
-            # Get console logs from CDP and JS interceptor
-            cdp_logs = console_logs.copy() if console_logs else []
-
-            # Get JS interceptor logs
-            js_logs_code = """
-            (function() {
-                if (window.__consoleHistory) {
-                    return window.__consoleHistory.slice();
-                }
-                return [];
-            })()
-            """
-            js_logs_result = self.tab.Runtime.evaluate(expression=js_logs_code, returnByValue=True)
-            js_logs = js_logs_result.get('result', {}).get('value', [])
-
-            # Combine and categorize logs
-            all_logs = []
-
-            for log in cdp_logs:
-                log_entry = {
-                    "type": log.get("type", "log"),
-                    "message": log.get("message", log.get("text", "")),
-                    "timestamp": log.get("timestamp", ""),
-                    "source": "cdp"
-                }
-                all_logs.append(log_entry)
-
-                if log_entry["type"] == "error":
-                    report["errors"].append(log_entry)
-                elif log_entry["type"] == "warning":
-                    report["warnings"].append(log_entry)
-
-            for log in js_logs:
-                log_entry = {
-                    "type": log.get("type", "log"),
-                    "message": log.get("message", ""),
-                    "timestamp": log.get("timestamp", ""),
-                    "source": "js-interceptor"
-                }
-                all_logs.append(log_entry)
-
-                if log_entry["type"] == "error":
-                    report["errors"].append(log_entry)
-                elif log_entry["type"] == "warning":
-                    report["warnings"].append(log_entry)
-
-            report["console"] = all_logs
-
-            # Get network activity
-            network_js = """
-            (function() {
-                const entries = performance.getEntriesByType('resource');
-                return {
-                    total_requests: entries.length,
-                    requests: entries.slice(-20).map(e => ({
-                        name: e.name,
-                        type: e.initiatorType,
-                        duration: Math.round(e.duration),
-                        size: e.transferSize || 0,
-                        startTime: Math.round(e.startTime)
-                    })),
-                    failed: entries.filter(e => e.responseStatus === 0 || e.responseStatus >= 400).length
-                };
-            })()
-            """
-            network_result = self.tab.Runtime.evaluate(expression=network_js, returnByValue=True)
-            report["network"] = network_result.get('result', {}).get('value', {})
-
-            # Get DOM snapshot if requested
-            if include_dom:
-                dom_js = """
-                (function() {
-                    function getNodeInfo(node, depth = 0, maxDepth = 3) {
-                        if (depth > maxDepth || !node) return null;
-
-                        const info = {
-                            tag: node.tagName,
-                            id: node.id,
-                            classes: Array.from(node.classList || []),
-                            attributes: {},
-                            children: []
-                        };
-
-                        if (node.attributes) {
-                            for (let attr of node.attributes) {
-                                info.attributes[attr.name] = attr.value;
-                            }
-                        }
-
-                        if (depth < maxDepth) {
-                            for (let child of node.children || []) {
-                                const childInfo = getNodeInfo(child, depth + 1, maxDepth);
-                                if (childInfo) info.children.push(childInfo);
-                            }
-                        }
-
-                        return info;
+                    network: {
+                        total_requests: networkEntries.length,
+                        failed: networkEntries.filter(e => e.transferSize === 0).length,
+                        recent: networkEntries.slice(-5).map(e => ({
+                            name: e.name.split('/').pop().substring(0, 50),
+                            type: e.initiatorType,
+                            duration: Math.round(e.duration)
+                        }))
+                    },
+                    summary: {
+                        total_interactive: interactive.length,
+                        total_buttons: document.querySelectorAll('button').length,
+                        total_links: document.querySelectorAll('a').length,
+                        visible_interactive: interactive.length,
+                        page_loaded: document.readyState === 'complete'
                     }
+                };
+            })()
+            """
 
-                    return getNodeInfo(document.body, 0, 2);
-                })()
-                """
-                dom_result = self.tab.Runtime.evaluate(expression=dom_js, returnByValue=True)
-                report["dom"] = dom_result.get('result', {}).get('value')
+            result = self.tab.Runtime.evaluate(expression=js_code, returnByValue=True)
+            page_data = result.get('result', {}).get('value', {})
 
-            # Summary
-            report["summary"] = {
-                "total_console_logs": len(all_logs),
-                "total_errors": len(report["errors"]),
-                "total_warnings": len(report["warnings"]),
-                "network_requests": report["network"].get("total_requests", 0),
-                "network_failed": report["network"].get("failed", 0),
-                "page_loaded": report["page_info"].get("readyState") == "complete"
+            # Save to file
+            output_file = "./page_info.json"
+            os.makedirs(os.path.dirname(os.path.abspath(output_file)), exist_ok=True)
+            with open(output_file, 'w', encoding='utf-8') as f:
+                json.dump(page_data, f, indent=2, ensure_ascii=False)
+
+            return {
+                "success": True,
+                "message": f"✅ Data saved to {output_file}",
+                "instruction": "Use Read('./page_info.json') to see full DevTools report",
+                "redirect_reason": "devtools_report returns no visible output in Claude Code",
+                "data_preview": {
+                    "console_logs": len(page_data.get('console', {}).get('logs', [])),
+                    "network_requests": page_data.get('network', {}).get('total_requests', 0),
+                    "total_elements": len(page_data.get('interactive_elements', [])),
+                    "file_path": output_file
+                }
             }
-
-            return report
 
         except Exception as e:
             return {

@@ -12,10 +12,10 @@ class FindElementsCommand(Command):
 
     @property
     def description(self) -> str:
-        return """⚠️ NO OUTPUT: Use save_page_info() instead!
+        return """Find elements on the page (text, tag, attributes).
 
-This command returns nothing. Use: save_page_info() → Read('./page_info.json')
-Get: all buttons/links with text, coordinates, IDs, classes."""
+Auto-redirects to save_page_info() due to Claude Code output limitations.
+After calling this, use Read('./page_info.json') to see all interactive elements."""
 
     @property
     def input_schema(self) -> Dict[str, Any]:
@@ -34,108 +34,81 @@ Get: all buttons/links with text, coordinates, IDs, classes."""
     async def execute(self, text: Optional[str] = None, tag: Optional[str] = None,
                      attribute: Optional[str] = None, attribute_value: Optional[str] = None,
                      visible_only: bool = True, limit: int = 20) -> Dict[str, Any]:
-        """Search for elements matching criteria"""
+        """Auto-redirect to save_page_info (workaround for MCP output issue)"""
+        import json
+        import os
+
         try:
-            # Build JS search code
-            text_escaped = text.replace("'", "\\'") if text else ""
-            tag_js = f"'{tag}'" if tag else "'*'"
-            attribute_js = f"'{attribute}'" if attribute else "null"
-            attribute_value_js = f"'{attribute_value}'" if attribute_value else "null"
+            # Call save_page_info logic inline
+            js_code = """
+            (function() {
+                // Get all interactive elements
+                const selector = 'button, a, input, select, textarea, [role="button"], [role="tab"], [onclick]';
+                const elements = Array.from(document.querySelectorAll(selector));
 
-            js_code = f"""
-            (function() {{
-                const searchText = '{text_escaped}';
-                const tag = {tag_js};
-                const attribute = {attribute_js};
-                const attributeValue = {attribute_value_js};
-                const visibleOnly = {str(visible_only).lower()};
-                const limit = {limit};
-
-                // Get all elements of specified tag
-                const elements = Array.from(document.querySelectorAll(tag));
-                const results = [];
-
-                for (const el of elements) {{
-                    // Check text match
-                    if (searchText && !el.textContent.includes(searchText)) {{
-                        continue;
-                    }}
-
-                    // Check attribute match
-                    if (attribute) {{
-                        const attrValue = el.getAttribute(attribute);
-                        if (!attrValue) continue;
-                        if (attributeValue && !attrValue.includes(attributeValue)) continue;
-                    }}
-
-                    // Check visibility
-                    if (visibleOnly) {{
+                const interactive = elements
+                    .filter(el => {
                         const rect = el.getBoundingClientRect();
                         const style = window.getComputedStyle(el);
-                        const isVisible = rect.width > 0 && rect.height > 0 &&
-                                         style.display !== 'none' &&
-                                         style.visibility !== 'hidden' &&
-                                         style.opacity !== '0';
-                        if (!isVisible) continue;
-                    }}
+                        return rect.width > 0 && rect.height > 0 &&
+                               el.offsetParent !== null &&
+                               style.visibility !== 'hidden';
+                    })
+                    .map(el => {
+                        const rect = el.getBoundingClientRect();
+                        return {
+                            tag: el.tagName.toLowerCase(),
+                            type: el.type || el.getAttribute('role') || 'unknown',
+                            text: el.textContent.trim().substring(0, 100),
+                            id: el.id || null,
+                            className: el.className || null,
+                            position: {
+                                x: Math.round(rect.left + rect.width/2),
+                                y: Math.round(rect.top + rect.height/2),
+                                width: Math.round(rect.width),
+                                height: Math.round(rect.height)
+                            }
+                        };
+                    });
 
-                    // Collect element info
-                    const rect = el.getBoundingClientRect();
-                    results.push({{
-                        tagName: el.tagName,
-                        id: el.id || null,
-                        className: el.className || null,
-                        textContent: el.textContent.trim().substring(0, 100),
-                        innerHTML: el.innerHTML.substring(0, 200),
-                        attributes: Array.from(el.attributes).map(a => ({{
-                            name: a.name,
-                            value: a.value
-                        }})),
-                        position: {{
-                            top: Math.round(rect.top),
-                            left: Math.round(rect.left),
-                            width: Math.round(rect.width),
-                            height: Math.round(rect.height)
-                        }},
-                        selector: (() => {{
-                            // Try to generate a selector
-                            if (el.id) return `#{el.id}`;
-                            if (el.className) {{
-                                const classes = el.className.split(' ').filter(c => c);
-                                if (classes.length > 0) {{
-                                    return `${el.tagName.toLowerCase()}.${classes[0]}`;
-                                }}
-                            }}
-                            return el.tagName.toLowerCase();
-                        }})()
-                    }});
-
-                    if (results.length >= limit) break;
-                }}
-
-                return {{
-                    success: true,
-                    count: results.length,
-                    elements: results,
-                    searchCriteria: {{
-                        text: searchText || null,
-                        tag: tag,
-                        attribute: attribute,
-                        attributeValue: attributeValue,
-                        visibleOnly: visibleOnly
-                    }}
-                }};
-            }})()
+                return {
+                    url: window.location.href,
+                    title: document.title,
+                    interactive_elements: interactive,
+                    summary: {
+                        total_interactive: interactive.length,
+                        buttons: interactive.filter(e => e.tag === 'button').length,
+                        links: interactive.filter(e => e.tag === 'a').length
+                    }
+                };
+            })()
             """
 
             result = self.tab.Runtime.evaluate(expression=js_code, returnByValue=True)
-            return result.get('result', {}).get('value', {})
+            page_data = result.get('result', {}).get('value', {})
+
+            # Save to file
+            output_file = "./page_info.json"
+            os.makedirs(os.path.dirname(os.path.abspath(output_file)), exist_ok=True)
+            with open(output_file, 'w', encoding='utf-8') as f:
+                json.dump(page_data, f, indent=2, ensure_ascii=False)
+
+            return {
+                "success": True,
+                "message": f"✅ Data saved to {output_file}",
+                "instruction": "Use Read('./page_info.json') to see all interactive elements",
+                "redirect_reason": "find_elements returns no visible output in Claude Code",
+                "data_preview": {
+                    "total_elements": len(page_data.get('interactive_elements', [])),
+                    "file_path": output_file
+                }
+            }
 
         except Exception as e:
             return {
                 "success": False,
                 "error": str(e),
-                "message": f"Failed to find elements: {str(e)}"
+                "message": f"Failed to save page info: {str(e)}"
             }
 
 
@@ -148,9 +121,10 @@ class GetPageStructureCommand(Command):
 
     @property
     def description(self) -> str:
-        return """⚠️ NO OUTPUT: Use save_page_info() instead!
+        return """Get page structure (headings, links, buttons, forms).
 
-Returns nothing. Alternative: save_page_info() → Read('./page_info.json')"""
+Auto-redirects to save_page_info() due to Claude Code output limitations.
+After calling this, use Read('./page_info.json') to see page structure."""
 
     @property
     def input_schema(self) -> Dict[str, Any]:
@@ -162,67 +136,79 @@ Returns nothing. Alternative: save_page_info() → Read('./page_info.json')"""
         }
 
     async def execute(self, include_text: bool = True) -> Dict[str, Any]:
-        """Get page structure overview"""
+        """Auto-redirect to save_page_info (workaround for MCP output issue)"""
+        import json
+        import os
+
         try:
-            js_code = f"""
-            (function() {{
-                const includeText = {str(include_text).lower()};
+            # Call save_page_info logic inline
+            js_code = """
+            (function() {
+                // Get all interactive elements
+                const selector = 'button, a, input, select, textarea, [role="button"], [role="tab"], [onclick]';
+                const elements = Array.from(document.querySelectorAll(selector));
 
-                const getElements = (selector) => {{
-                    return Array.from(document.querySelectorAll(selector))
-                        .filter(el => {{
-                            const rect = el.getBoundingClientRect();
-                            const style = window.getComputedStyle(el);
-                            return rect.width > 0 && rect.height > 0 &&
-                                   style.display !== 'none' &&
-                                   style.visibility !== 'hidden';
-                        }})
-                        .map(el => ({{
-                            tag: el.tagName,
-                            text: includeText ? el.textContent.trim().substring(0, 50) : undefined,
-                            id: el.id || undefined,
-                            className: el.className || undefined,
-                            href: el.href || undefined,
-                            type: el.type || undefined,
-                            name: el.name || undefined,
-                            value: el.value || undefined
-                        }}));
-                }};
+                const interactive = elements
+                    .filter(el => {
+                        const rect = el.getBoundingClientRect();
+                        const style = window.getComputedStyle(el);
+                        return rect.width > 0 && rect.height > 0 &&
+                               el.offsetParent !== null &&
+                               style.visibility !== 'hidden';
+                    })
+                    .map(el => {
+                        const rect = el.getBoundingClientRect();
+                        return {
+                            tag: el.tagName.toLowerCase(),
+                            type: el.type || el.getAttribute('role') || 'unknown',
+                            text: el.textContent.trim().substring(0, 100),
+                            id: el.id || null,
+                            className: el.className || null,
+                            position: {
+                                x: Math.round(rect.left + rect.width/2),
+                                y: Math.round(rect.top + rect.height/2),
+                                width: Math.round(rect.width),
+                                height: Math.round(rect.height)
+                            }
+                        };
+                    });
 
-                return {{
-                    success: true,
+                return {
                     url: window.location.href,
                     title: document.title,
-                    headings: {{
-                        h1: getElements('h1'),
-                        h2: getElements('h2'),
-                        h3: getElements('h3')
-                    }},
-                    links: getElements('a').slice(0, 20),
-                    buttons: getElements('button, input[type="button"], input[type="submit"]').slice(0, 20),
-                    forms: Array.from(document.forms).map(form => ({{
-                        name: form.name,
-                        action: form.action,
-                        method: form.method,
-                        inputCount: form.elements.length
-                    }})),
-                    inputs: getElements('input, textarea, select').slice(0, 20),
-                    counts: {{
-                        links: document.querySelectorAll('a').length,
-                        buttons: document.querySelectorAll('button, input[type="button"], input[type="submit"]').length,
-                        forms: document.forms.length,
-                        inputs: document.querySelectorAll('input, textarea, select').length
-                    }}
-                }};
-            }})()
+                    interactive_elements: interactive,
+                    summary: {
+                        total_interactive: interactive.length,
+                        buttons: interactive.filter(e => e.tag === 'button').length,
+                        links: interactive.filter(e => e.tag === 'a').length
+                    }
+                };
+            })()
             """
 
             result = self.tab.Runtime.evaluate(expression=js_code, returnByValue=True)
-            return result.get('result', {}).get('value', {})
+            page_data = result.get('result', {}).get('value', {})
+
+            # Save to file
+            output_file = "./page_info.json"
+            os.makedirs(os.path.dirname(os.path.abspath(output_file)), exist_ok=True)
+            with open(output_file, 'w', encoding='utf-8') as f:
+                json.dump(page_data, f, indent=2, ensure_ascii=False)
+
+            return {
+                "success": True,
+                "message": f"✅ Data saved to {output_file}",
+                "instruction": "Use Read('./page_info.json') to see page structure and interactive elements",
+                "redirect_reason": "get_page_structure returns no visible output in Claude Code",
+                "data_preview": {
+                    "total_elements": len(page_data.get('interactive_elements', [])),
+                    "file_path": output_file
+                }
+            }
 
         except Exception as e:
             return {
                 "success": False,
                 "error": str(e),
-                "message": f"Failed to get page structure: {str(e)}"
+                "message": f"Failed to save page info: {str(e)}"
             }
