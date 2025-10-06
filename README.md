@@ -9,9 +9,9 @@ MCP (Model Context Protocol) сервер для управления брауз
 - **pychrome** — библиотека для взаимодействия с Chrome DevTools Protocol (CDP)
 - **Comet Browser** — запущен с флагом `--remote-debugging-port=9222`
 
-Сервер предоставляет 17 методов:
+Сервер предоставляет 18 методов:
 
-**Базовые:** `open_url`, `get_text`, `click`, `screenshot`, `evaluate_js`, `scroll_page`, `move_cursor`
+**Базовые:** `open_url`, `get_text`, `click`, `click_by_text`, `screenshot`, `evaluate_js`, `scroll_page`, `move_cursor`
 
 **DevTools:** `open_devtools`, `close_devtools`, `console_command`, `get_console_logs`, `inspect_element`, `get_network_activity`
 

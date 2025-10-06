@@ -331,6 +331,10 @@ class CometMCPServer:
             self.tab.Page.navigate(url=url, _timeout=30)
             # Wait for page load
             await asyncio.sleep(2)
+
+            # Re-initialize cursor after page load (page navigation clears it)
+            await self._initialize_ai_cursor()
+
             return {"success": True, "url": url, "message": f"Opened {url}"}
         except Exception as e:
             raise RuntimeError(f"Failed to open URL: {str(e)}")
@@ -372,10 +376,59 @@ class CometMCPServer:
         """Click on an element matching CSS selector with optional cursor animation"""
         try:
             await self.ensure_connected()
-            # Enhanced click with cursor animation and detailed diagnostics
+
+            # Re-initialize cursor if needed (in case page was reloaded)
+            await self._initialize_ai_cursor()
+
+            # Enhanced click with multiple search strategies and cursor animation
             js_code = f"""
             (function() {{
-                const el = document.querySelector('{selector}');
+                // Try multiple strategies to find the element
+                let el = null;
+                let strategy = '';
+
+                // Strategy 1: Direct CSS selector
+                el = document.querySelector('{selector}');
+                if (el) strategy = 'css';
+
+                // Strategy 2: XPath (if selector starts with //)
+                if (!el && '{selector}'.startsWith('//')) {{
+                    try {{
+                        const result = document.evaluate('{selector}', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+                        el = result.singleNodeValue;
+                        if (el) strategy = 'xpath';
+                    }} catch(e) {{}}
+                }}
+
+                // Strategy 3: Text content search (if selector contains text)
+                if (!el && ('{selector}'.includes('text') || '{selector}'.includes('содержит'))) {{
+                    const textMatch = '{selector}'.match(/["']([^"']+)["']/);
+                    if (textMatch) {{
+                        const searchText = textMatch[1];
+                        el = Array.from(document.querySelectorAll('button, a, [role="button"], [role="tab"], [onclick]'))
+                            .find(e => e.textContent.trim() === searchText || e.textContent.includes(searchText));
+                        if (el) strategy = 'text-exact';
+                    }}
+                }}
+
+                // Strategy 4: Try common clickable patterns
+                if (!el) {{
+                    const patterns = [
+                        'button:contains("{selector}")',
+                        'a:contains("{selector}")',
+                        '[role="button"]:contains("{selector}")',
+                        '[role="tab"]:contains("{selector}")'
+                    ];
+
+                    // Manual contains implementation
+                    const allClickable = document.querySelectorAll('button, a, [role="button"], [role="tab"], [onclick], input[type="button"], input[type="submit"]');
+                    el = Array.from(allClickable).find(e =>
+                        e.textContent.includes('{selector}') ||
+                        e.getAttribute('aria-label')?.includes('{selector}') ||
+                        e.title?.includes('{selector}')
+                    );
+                    if (el) strategy = 'text-contains';
+                }}
 
                 if (!el) {{
                     // Check if selector matches multiple elements
@@ -385,7 +438,7 @@ class CometMCPServer:
                         reason: 'not_found',
                         message: 'Element not found: {selector}',
                         matchCount: allMatches.length,
-                        suggestion: allMatches.length > 0 ? 'Selector matches ' + allMatches.length + ' elements' : 'No elements match this selector'
+                        suggestion: allMatches.length > 0 ? 'Selector matches ' + allMatches.length + ' elements' : 'Try using text content or XPath'
                     }};
                 }}
 
@@ -416,6 +469,17 @@ class CometMCPServer:
                                   rect.bottom <= window.innerHeight &&
                                   rect.right <= window.innerWidth;
 
+                // Scroll element into view if not in viewport
+                if (!inViewport) {{
+                    el.scrollIntoView({{ behavior: 'smooth', block: 'center', inline: 'center' }});
+                    // Wait a bit for scroll
+                    await new Promise(r => setTimeout(r, 300));
+                    // Recalculate position after scroll
+                    const newRect = el.getBoundingClientRect();
+                    rect.top = newRect.top;
+                    rect.left = newRect.left;
+                }}
+
                 // Calculate click position (center of element)
                 const clickX = rect.left + rect.width / 2;
                 const clickY = rect.top + rect.height / 2;
@@ -435,14 +499,55 @@ class CometMCPServer:
                                 window.__clickAICursor__();
                             }}
 
-                            // Perform the click
-                            el.click();
+                            // Try multiple click methods for maximum compatibility
+                            let clickSuccess = false;
+
+                            // Method 1: Standard click
+                            try {{
+                                el.click();
+                                clickSuccess = true;
+                            }} catch (e1) {{
+                                console.warn('Standard click failed:', e1);
+                            }}
+
+                            // Method 2: MouseEvent sequence (for React/Vue apps)
+                            if (!clickSuccess || true) {{ // Always try for reliability
+                                try {{
+                                    ['mousedown', 'mouseup', 'click'].forEach(eventType => {{
+                                        const event = new MouseEvent(eventType, {{
+                                            view: window,
+                                            bubbles: true,
+                                            cancelable: true,
+                                            clientX: clickX,
+                                            clientY: clickY
+                                        }});
+                                        el.dispatchEvent(event);
+                                    }});
+                                    clickSuccess = true;
+                                }} catch (e2) {{
+                                    console.warn('MouseEvent click failed:', e2);
+                                }}
+                            }}
+
+                            // Method 3: Focus and trigger (for form elements)
+                            if (el.tagName === 'BUTTON' || el.tagName === 'INPUT' || el.tagName === 'A') {{
+                                try {{
+                                    el.focus();
+                                    if (el.onclick) {{
+                                        el.onclick.call(el);
+                                    }}
+                                }} catch (e3) {{
+                                    console.warn('Focus/trigger click failed:', e3);
+                                }}
+                            }}
 
                             resolve({{
                                 success: true,
                                 selector: '{selector}',
-                                message: 'Clicked element: {selector}',
+                                strategy: strategy,
+                                message: 'Clicked element using strategy: ' + strategy,
                                 cursorAnimated: showCursor,
+                                cursorVisible: window.__aiCursor__ && window.__aiCursor__.style.display !== 'none',
                                 elementInfo: {{
                                     tagName: el.tagName,
                                     id: el.id,
@@ -463,7 +568,7 @@ class CometMCPServer:
                             resolve({{
                                 success: false,
                                 reason: 'click_failed',
-                                message: 'Click failed: ' + clickError.message,
+                                message: 'All click methods failed: ' + clickError.message,
                                 error: clickError.toString()
                             }});
                         }}
@@ -485,6 +590,117 @@ class CometMCPServer:
                 "success": False,
                 "reason": "exception",
                 "message": f"Failed to click element: {str(e)}",
+                "error": str(e)
+            }
+
+    async def click_by_text(self, text: str, tag: str = None, exact: bool = False) -> Dict[str, Any]:
+        """Click on an element by its text content (more reliable than CSS selectors)"""
+        try:
+            await self.ensure_connected()
+            await self._initialize_ai_cursor()
+
+            tag_filter = f", '{tag}'" if tag else ""
+            match_method = "===" if exact else "includes"
+
+            js_code = f"""
+            (function() {{
+                // Find all potentially clickable elements
+                const tags = {f"['{tag}']" if tag else "['button', 'a', '[role=\"button\"]', '[role=\"tab\"]', 'input[type=\"button\"]', 'input[type=\"submit\"]', '[onclick]']"};
+                const selector = tags.join(', ');
+                const elements = Array.from(document.querySelectorAll(selector));
+
+                // Search for element with matching text
+                const searchText = '{text}';
+                const el = elements.find(e =>
+                    (e.textContent.trim() {match_method} searchText) ||
+                    (e.getAttribute('aria-label') {match_method} searchText) ||
+                    (e.title {match_method} searchText) ||
+                    (e.value {match_method} searchText)
+                );
+
+                if (!el) {{
+                    return {{
+                        success: false,
+                        message: 'Element with text not found: {text}',
+                        searchedTags: tags,
+                        totalElements: elements.length,
+                        availableTexts: elements.slice(0, 10).map(e => e.textContent.trim().substring(0, 50))
+                    }};
+                }}
+
+                // Get element position
+                const rect = el.getBoundingClientRect();
+                const clickX = rect.left + rect.width / 2;
+                const clickY = rect.top + rect.height / 2;
+
+                // Scroll into view if needed
+                const inViewport = rect.top >= 0 && rect.left >= 0 &&
+                                  rect.bottom <= window.innerHeight &&
+                                  rect.right <= window.innerWidth;
+
+                if (!inViewport) {{
+                    el.scrollIntoView({{ behavior: 'smooth', block: 'center', inline: 'center' }});
+                    await new Promise(r => setTimeout(r, 300));
+                }}
+
+                // Animate cursor
+                if (window.__moveAICursor__) {{
+                    window.__moveAICursor__(clickX, clickY, 400);
+                }}
+
+                // Wait and click
+                return new Promise((resolve) => {{
+                    setTimeout(() => {{
+                        try {{
+                            if (window.__clickAICursor__) {{
+                                window.__clickAICursor__();
+                            }}
+
+                            // Multiple click methods
+                            el.click();
+
+                            ['mousedown', 'mouseup', 'click'].forEach(eventType => {{
+                                const event = new MouseEvent(eventType, {{
+                                    view: window,
+                                    bubbles: true,
+                                    cancelable: true,
+                                    clientX: clickX,
+                                    clientY: clickY
+                                }});
+                                el.dispatchEvent(event);
+                            }});
+
+                            resolve({{
+                                success: true,
+                                text: '{text}',
+                                message: 'Clicked element with text: {text}',
+                                cursorVisible: window.__aiCursor__ && window.__aiCursor__.style.display !== 'none',
+                                element: {{
+                                    tag: el.tagName,
+                                    id: el.id,
+                                    className: el.className,
+                                    actualText: el.textContent.trim().substring(0, 100),
+                                    position: {{ x: clickX, y: clickY }}
+                                }}
+                            }});
+                        }} catch (e) {{
+                            resolve({{
+                                success: false,
+                                message: 'Click failed: ' + e.message,
+                                error: e.toString()
+                            }});
+                        }}
+                    }}, 450);
+                }});
+            }})()
+            """
+
+            result = self.tab.Runtime.evaluate(expression=js_code, returnByValue=True, awaitPromise=True)
+            return result.get('result', {}).get('value', {})
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Failed to click by text: {str(e)}",
                 "error": str(e)
             }
 
@@ -1259,13 +1475,26 @@ class MCPJSONRPCServer:
                 },
                 {
                     "name": "click",
-                    "description": "Click on an element matching a CSS selector",
+                    "description": "Click on an element matching a CSS selector. Supports XPath (//), text search, and ARIA attributes. Auto-scrolls to element and shows cursor animation.",
                     "inputSchema": {
                         "type": "object",
                         "properties": {
-                            "selector": {"type": "string", "description": "CSS selector"}
+                            "selector": {"type": "string", "description": "CSS selector, XPath (//button), or text content"}
                         },
                         "required": ["selector"]
+                    }
+                },
+                {
+                    "name": "click_by_text",
+                    "description": "Click on an element by its visible text content. More reliable than CSS selectors for buttons and links. Searches in textContent, aria-label, title, and value attributes.",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "text": {"type": "string", "description": "Text to search for (e.g. 'Тестирование', 'Submit', 'Next')"},
+                            "tag": {"type": "string", "description": "Optional: limit search to specific tag (e.g. 'button', 'a')"},
+                            "exact": {"type": "boolean", "description": "If true, match exact text; if false, match partial text (default: false)", "default": false}
+                        },
+                        "required": ["text"]
                     }
                 },
                 {
@@ -1422,6 +1651,11 @@ class MCPJSONRPCServer:
             return await self.comet.get_text(arguments['selector'])
         elif tool_name == 'click':
             return await self.comet.click(arguments['selector'])
+        elif tool_name == 'click_by_text':
+            text = arguments['text']
+            tag = arguments.get('tag')
+            exact = arguments.get('exact', False)
+            return await self.comet.click_by_text(text, tag, exact)
         elif tool_name == 'screenshot':
             path = arguments.get('path', './screenshot.png')
             return await self.comet.screenshot(path)
