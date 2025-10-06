@@ -14,7 +14,9 @@ class ScreenshotCommand(Command):
 
     @property
     def description(self) -> str:
-        return "Take a screenshot of the current page"
+        return """Take PNG screenshot of current page. HEAVY (~1800 tokens). Use save_page_info instead when possible (saves 75% tokens).
+
+Auto-saves to ./screenshots/ folder. Use Read tool to view: Read('./screenshots/screenshot.png')"""
 
     @property
     def input_schema(self) -> Dict[str, Any]:

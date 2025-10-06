@@ -14,7 +14,11 @@ class SavePageInfoCommand(Command):
 
     @property
     def description(self) -> str:
-        return "Save page info to file (workaround for output visibility issues)"
+        return """Save complete page state to JSON file. ALWAYS use Read tool after this to see results!
+
+Returns: All interactive elements with coordinates, console logs, network info
+Usage: 1) Call save_page_info() 2) Read('./page_info.json') to see data
+Contains: buttons/links positions, DevTools console (last 10 logs), network requests"""
 
     @property
     def input_schema(self) -> Dict[str, Any]:

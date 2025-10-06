@@ -218,7 +218,10 @@ class ClickByTextCommand(Command):
 
     @property
     def description(self) -> str:
-        return "Click on an element by its visible text content. More reliable than CSS selectors for buttons and links."
+        return """Click element by text. Auto-finds coordinates, moves cursor, clicks. Returns success/failure.
+
+Best for: buttons, links, tabs. Auto-scrolls into view if needed.
+Tip: Use save_page_info() first to see available elements and verify click worked."""
 
     @property
     def input_schema(self) -> Dict[str, Any]:
