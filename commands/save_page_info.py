@@ -56,6 +56,12 @@ class SavePageInfoCommand(Command):
                         };
                     });
 
+                // Get console logs if available
+                const consoleLogs = window.__consoleHistory || [];
+
+                // Get network info
+                const networkEntries = performance.getEntriesByType('resource') || [];
+
                 return {
                     url: window.location.href,
                     title: document.title,
@@ -64,10 +70,24 @@ class SavePageInfoCommand(Command):
                         height: window.innerHeight
                     },
                     interactive_elements: interactive,
+                    console: {
+                        logs: consoleLogs.slice(-10),  // Last 10 logs
+                        total: consoleLogs.length
+                    },
+                    network: {
+                        total_requests: networkEntries.length,
+                        failed: networkEntries.filter(e => e.transferSize === 0).length,
+                        recent: networkEntries.slice(-5).map(e => ({
+                            name: e.name.split('/').pop().substring(0, 50),
+                            type: e.initiatorType,
+                            duration: Math.round(e.duration)
+                        }))
+                    },
                     summary: {
                         total_buttons: document.querySelectorAll('button').length,
                         total_links: document.querySelectorAll('a').length,
-                        visible_interactive: interactive.length
+                        visible_interactive: interactive.length,
+                        page_loaded: document.readyState === 'complete'
                     }
                 };
             })()
