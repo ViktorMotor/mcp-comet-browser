@@ -13,8 +13,11 @@ class EnableConsoleLoggingCommand(Command):
         "properties": {}
     }
 
-    async def execute(self, connection=None) -> Dict[str, Any]:
+    requires_connection = True
+
+    async def execute(self, **kwargs) -> Dict[str, Any]:
         """Force re-enable console logging"""
+        connection = self.context.connection
         if not connection:
             return {"success": False, "message": "No browser connection"}
 

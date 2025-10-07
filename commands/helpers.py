@@ -135,9 +135,12 @@ class ForceClickCommand(Command):
         }
     }
 
-    async def execute(self, x: int = None, y: int = None, text: str = None, cursor=None) -> Dict[str, Any]:
+    requires_cursor = True
+
+    async def execute(self, x: int = None, y: int = None, text: str = None, **kwargs) -> Dict[str, Any]:
         """Force click at coordinates or on text"""
         try:
+            cursor = self.context.cursor
             if cursor:
                 await cursor.initialize()
 

@@ -18,7 +18,9 @@ After calling this, use Read('./page_info.json') to see full report."""
         }
     }
 
-    async def execute(self, include_dom: bool = False, console_logs=None) -> Dict[str, Any]:
+    requires_console_logs = True
+
+    async def execute(self, include_dom: bool = False, **kwargs) -> Dict[str, Any]:
         """Auto-redirect to save_page_info (workaround for MCP output issue)"""
         import json
         import os

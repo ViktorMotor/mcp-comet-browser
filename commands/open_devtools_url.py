@@ -14,9 +14,14 @@ class OpenDevToolsUrlCommand(Command):
         "properties": {}
     }
 
-    async def execute(self, browser=None, current_tab=None) -> Dict[str, Any]:
+    requires_browser = True
+
+    async def execute(self, **kwargs) -> Dict[str, Any]:
         """Open DevTools UI in new tab"""
         try:
+            browser = self.context.browser
+            current_tab = self.tab
+
             # Get debug host from browser connection
             if hasattr(browser, '_url'):
                 debug_host = browser._url.split('://')[1].split(':')[0]

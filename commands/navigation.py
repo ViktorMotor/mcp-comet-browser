@@ -17,7 +17,9 @@ class OpenUrlCommand(Command):
         "required": ["url"]
     }
 
-    async def execute(self, url: str, cursor=None) -> Dict[str, Any]:
+    requires_cursor = True
+
+    async def execute(self, url: str, **kwargs) -> Dict[str, Any]:
         """Navigate to URL and reinitialize cursor"""
         try:
             self.tab.Page.navigate(url=url, _timeout=30)
@@ -25,6 +27,7 @@ class OpenUrlCommand(Command):
             await asyncio.sleep(2)
 
             # Re-initialize cursor after page load (navigation clears it)
+            cursor = self.context.cursor
             if cursor:
                 await cursor.initialize()
 

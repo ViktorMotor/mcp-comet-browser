@@ -13,9 +13,13 @@ class ListTabsCommand(Command):
         "properties": {}
     }
 
-    async def execute(self, browser, current_tab) -> Dict[str, Any]:
+    requires_browser = True
+
+    async def execute(self, **kwargs) -> Dict[str, Any]:
         """List all tabs with their info"""
         try:
+            browser = self.context.browser
+            current_tab = self.tab
             tabs = browser.list_tab()
 
             tabs_info = []
@@ -49,9 +53,12 @@ class CreateTabCommand(Command):
         }
     }
 
-    async def execute(self, browser, url: Optional[str] = None) -> Dict[str, Any]:
+    requires_browser = True
+
+    async def execute(self, url: Optional[str] = None, **kwargs) -> Dict[str, Any]:
         """Create new tab with optional URL"""
         try:
+            browser = self.context.browser
             new_tab = browser.new_tab(url=url)
 
             return {
@@ -76,9 +83,14 @@ class CloseTabCommand(Command):
         }
     }
 
-    async def execute(self, browser, current_tab, tab_id: Optional[str] = None) -> Dict[str, Any]:
+    requires_browser = True
+
+    async def execute(self, tab_id: Optional[str] = None, **kwargs) -> Dict[str, Any]:
         """Close tab by ID or current tab"""
         try:
+            browser = self.context.browser
+            current_tab = self.tab
+
             if tab_id is None:
                 if current_tab:
                     tab_id = getattr(current_tab, 'id', None)
@@ -125,9 +137,14 @@ class SwitchTabCommand(Command):
         "required": ["tab_id"]
     }
 
-    async def execute(self, browser, current_tab, tab_id: str) -> Dict[str, Any]:
+    requires_browser = True
+
+    async def execute(self, tab_id: str, **kwargs) -> Dict[str, Any]:
         """Switch to target tab and enable necessary domains"""
         try:
+            browser = self.context.browser
+            current_tab = self.tab
+
             # Find tab by ID
             tabs = browser.list_tab()
             target_tab = None

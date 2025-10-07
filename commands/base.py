@@ -1,6 +1,7 @@
 """Base command class for MCP browser commands"""
 from typing import Any, Dict
 from abc import ABC, abstractmethod
+from .context import CommandContext
 
 
 class Command(ABC):
@@ -10,6 +11,12 @@ class Command(ABC):
         name: str - Command name for MCP registration
         description: str - Command description for MCP
         input_schema: Dict[str, Any] - JSON schema for command parameters
+
+    Dependency declarations (optional class attributes):
+        requires_cursor: bool = False - Command needs AI cursor
+        requires_browser: bool = False - Command needs browser instance
+        requires_console_logs: bool = False - Command needs console logs
+        requires_connection: bool = False - Command needs full connection
     """
 
     # Class attributes - must be overridden by subclasses
@@ -17,13 +24,28 @@ class Command(ABC):
     description: str = None
     input_schema: Dict[str, Any] = None
 
-    def __init__(self, tab):
-        """Initialize command with browser tab reference
+    # Dependency declarations - optional
+    requires_cursor: bool = False
+    requires_browser: bool = False
+    requires_console_logs: bool = False
+    requires_connection: bool = False
+
+    def __init__(self, context: CommandContext):
+        """Initialize command with execution context
 
         Args:
-            tab: pychrome Tab instance
+            context: CommandContext with all dependencies
         """
-        self.tab = tab
+        # Validate required dependencies
+        context.validate_requirements(
+            requires_cursor=self.requires_cursor,
+            requires_browser=self.requires_browser,
+            requires_console_logs=self.requires_console_logs,
+            requires_connection=self.requires_connection
+        )
+
+        self.context = context
+        self.tab = context.tab  # Backward compatibility
 
     @abstractmethod
     async def execute(self, **kwargs) -> Dict[str, Any]:

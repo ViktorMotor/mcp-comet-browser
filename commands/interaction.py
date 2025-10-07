@@ -20,10 +20,13 @@ class ClickCommand(Command):
         "required": ["selector"]
     }
 
-    async def execute(self, selector: str, show_cursor: bool = True, cursor=None) -> Dict[str, Any]:
+    requires_cursor = True
+
+    async def execute(self, selector: str, show_cursor: bool = True, **kwargs) -> Dict[str, Any]:
         """Execute click with multiple strategies and cursor animation"""
         try:
             # Always initialize and show cursor
+            cursor = self.context.cursor
             if cursor:
                 await cursor.initialize()
 
@@ -231,10 +234,13 @@ Tip: Use save_page_info() first to see available elements and verify click worke
         "required": ["text"]
     }
 
-    async def execute(self, text: str, tag: Optional[str] = None, exact: bool = False, cursor=None) -> Dict[str, Any]:
+    requires_cursor = True
+
+    async def execute(self, text: str, tag: Optional[str] = None, exact: bool = False, **kwargs) -> Dict[str, Any]:
         """Execute click by text with cursor animation"""
         try:
             # Always initialize and show cursor
+            cursor = self.context.cursor
             if cursor:
                 await cursor.initialize()
 
@@ -641,8 +647,10 @@ class MoveCursorCommand(Command):
         }
     }
 
+    requires_cursor = True
+
     async def execute(self, x: Optional[int] = None, y: Optional[int] = None,
-                     selector: Optional[str] = None, duration: int = 400, cursor=None) -> Dict[str, Any]:
+                     selector: Optional[str] = None, duration: int = 400, **kwargs) -> Dict[str, Any]:
         """Execute cursor movement"""
         try:
             if selector:

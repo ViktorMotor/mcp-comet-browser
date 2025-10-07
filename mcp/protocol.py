@@ -9,6 +9,7 @@ from mcp.errors import (
     MCPError, ParseError, MethodNotFound, InternalError,
     BrowserError, CommandError, ValidationError
 )
+from commands.context import CommandContext
 
 logger = get_logger("protocol")
 from commands.navigation import OpenUrlCommand, GetTextCommand
@@ -178,22 +179,18 @@ class MCPJSONRPCServer:
         # Ensure connection is valid
         await self.connection.ensure_connected()
 
-        # Get command class and instantiate with current tab
-        cmd_class = self.commands[tool_name]
-        cmd_instance = cmd_class(tab=self.connection.tab)
+        # Create execution context with all dependencies
+        context = CommandContext(
+            tab=self.connection.tab,
+            cursor=self.connection.cursor,
+            browser=self.connection.browser,
+            console_logs=self.connection.console_logs,
+            connection=self.connection
+        )
 
-        # Handle special cases that need extra context
-        if tool_name in ['click', 'click_by_text', 'move_cursor', 'force_click']:
-            arguments['cursor'] = self.connection.cursor
-        elif tool_name == 'open_url':
-            arguments['cursor'] = self.connection.cursor
-        elif tool_name in ['get_console_logs', 'devtools_report']:
-            arguments['console_logs'] = self.connection.console_logs
-        elif tool_name == 'enable_console_logging':
-            arguments['connection'] = self.connection
-        elif tool_name in ['list_tabs', 'create_tab', 'close_tab', 'switch_tab', 'open_devtools_ui']:
-            arguments['browser'] = self.connection.browser
-            arguments['current_tab'] = self.connection.tab
+        # Get command class and instantiate with context
+        cmd_class = self.commands[tool_name]
+        cmd_instance = cmd_class(context=context)
 
         # Execute command
         result = await cmd_instance.execute(**arguments)
