@@ -2,6 +2,9 @@
 import asyncio
 from typing import Dict, Any, Optional
 from .base import Command
+from mcp.logging_config import get_logger
+
+logger = get_logger("commands.interaction")
 
 
 class ClickCommand(Command):
@@ -24,8 +27,7 @@ class ClickCommand(Command):
             if cursor:
                 await cursor.initialize()
 
-            import sys
-            print(f"[MCP] click: targeting selector '{selector}' (show_cursor={show_cursor})", file=sys.stderr)
+            logger.debug(f"click: targeting selector '{selector}' (show_cursor={show_cursor})")
 
             js_code = f"""
             (function() {{
@@ -191,13 +193,13 @@ class ClickCommand(Command):
             result = self.tab.Runtime.evaluate(expression=js_code, returnByValue=True, awaitPromise=True)
             click_result = result.get('result', {}).get('value', {})
 
-            # Log result to stderr for debugging
+            # Log result for debugging
             if click_result.get('success'):
                 element_info = click_result.get('elementInfo', {})
-                print(f"[MCP] ✓ Successfully clicked: '{selector}' (element: {element_info.get('tagName', 'unknown')}, strategy: {click_result.get('strategy', 'unknown')})", file=sys.stderr)
+                logger.info(f"✓ Successfully clicked: '{selector}' (element: {element_info.get('tagName', 'unknown')}, strategy: {click_result.get('strategy', 'unknown')})")
                 await asyncio.sleep(0.3)
             else:
-                print(f"[MCP] ✗ Failed to click: '{selector}' - {click_result.get('message', 'unknown error')}", file=sys.stderr)
+                logger.warning(f"✗ Failed to click: '{selector}' - {click_result.get('message', 'unknown error')}")
 
             return click_result
         except Exception as e:
@@ -207,7 +209,7 @@ class ClickCommand(Command):
                 "message": f"Failed to click element: {str(e)}",
                 "error": str(e)
             }
-            print(f"[MCP] ✗ Exception during click: '{selector}' - {str(e)}", file=sys.stderr)
+            logger.error(f"✗ Exception during click: '{selector}' - {str(e)}")
             return error_result
 
 
@@ -236,8 +238,7 @@ Tip: Use save_page_info() first to see available elements and verify click worke
             if cursor:
                 await cursor.initialize()
 
-            import sys
-            print(f"[MCP] click_by_text: searching for '{text}' (exact={exact}, tag={tag})", file=sys.stderr)
+            logger.debug(f"click_by_text: searching for '{text}' (exact={exact}, tag={tag})")
 
             # Escape special characters for JavaScript
             import json
@@ -494,9 +495,9 @@ Tip: Use save_page_info() first to see available elements and verify click worke
 
             # Log result to stderr for debugging
             if click_result.get('success'):
-                print(f"[MCP] ✓ Successfully clicked: '{text}' (element: {click_result.get('element', {}).get('tag', 'unknown')}, score: {click_result.get('matchScore', 0)})", file=sys.stderr)
+                logger.info(f"✓ Successfully clicked: '{text}' (element: {click_result.get('element', {}).get('tag', 'unknown')}, score: {click_result.get('matchScore', 0)})")
             else:
-                print(f"[MCP] ✗ Failed to click: '{text}' - {click_result.get('message', 'unknown error')}", file=sys.stderr)
+                logger.warning(f"✗ Failed to click: '{text}' - {click_result.get('message', 'unknown error')}")
 
             return click_result
         except Exception as e:
@@ -505,7 +506,7 @@ Tip: Use save_page_info() first to see available elements and verify click worke
                 "message": f"Failed to click by text: {str(e)}",
                 "error": str(e)
             }
-            print(f"[MCP] ✗ Exception during click: '{text}' - {str(e)}", file=sys.stderr)
+            logger.error(f"✗ Exception during click: '{text}' - {str(e)}")
             return error_result
 
 

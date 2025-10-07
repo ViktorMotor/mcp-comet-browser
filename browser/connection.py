@@ -4,6 +4,9 @@ import asyncio
 from typing import Optional
 import pychrome
 from .cursor import AICursor
+from mcp.logging_config import get_logger
+
+logger = get_logger("browser.connection")
 
 
 class BrowserConnection:
@@ -55,7 +58,7 @@ class BrowserConnection:
                     return True
                 except Exception as e:
                     # Tab is dead, need to reconnect
-                    print(f"Tab connection lost: {str(e)}, reconnecting...", file=sys.stderr)
+                    logger.warning(f"Tab connection lost: {str(e)}, reconnecting...")
                     try:
                         self.tab.stop()
                     except:
@@ -170,7 +173,7 @@ class BrowserConnection:
 
                 self.console_logs.append(log_entry)
             except Exception as e:
-                print(f"Error handling console message: {e}", file=sys.stderr)
+                logger.error(f"Error handling console message: {e}")
 
         # Subscribe to Console.messageAdded events
         self.tab.Console.messageAdded = console_message_handler
@@ -209,7 +212,7 @@ class BrowserConnection:
 
                 self.console_logs.append(log_entry)
             except Exception as e:
-                print(f"Error handling console API call: {e}", file=sys.stderr)
+                logger.error(f"Error handling console API call: {e}")
 
         # Subscribe to Runtime.consoleAPICalled
         self.tab.set_listener("Runtime.consoleAPICalled", console_api_handler)
@@ -235,7 +238,7 @@ class BrowserConnection:
 
                 self.console_logs.append(log_entry)
             except Exception as e:
-                print(f"Error handling exception: {e}", file=sys.stderr)
+                logger.error(f"Error handling exception: {e}")
 
         self.tab.set_listener("Runtime.exceptionThrown", exception_handler)
 
@@ -276,7 +279,7 @@ class BrowserConnection:
             result = self.tab.Runtime.evaluate(expression=js_code, returnByValue=True)
             return result.get('result', {}).get('value', {})
         except Exception as e:
-            print(f"Failed to initialize JS console interceptor: {e}", file=sys.stderr)
+            logger.error(f"Failed to initialize JS console interceptor: {e}")
             return {"success": False, "error": str(e)}
 
     async def close(self):

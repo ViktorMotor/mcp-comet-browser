@@ -4,6 +4,9 @@ import json
 import asyncio
 from typing import Dict, Any
 from browser.connection import BrowserConnection
+from mcp.logging_config import get_logger
+
+logger = get_logger("protocol")
 from commands.navigation import OpenUrlCommand, GetTextCommand
 from commands.interaction import ClickCommand, ClickByTextCommand, ScrollPageCommand, MoveCursorCommand
 from commands.devtools import (
@@ -204,9 +207,9 @@ class MCPJSONRPCServer:
         """Main server loop: read from stdin, write to stdout"""
         loop = asyncio.get_event_loop()
 
-        # Log startup to stderr
-        print("MCP Comet Server starting...", file=sys.stderr)
-        print("Listening for JSON-RPC requests on stdin...", file=sys.stderr)
+        # Log startup
+        logger.info("MCP Comet Server starting...")
+        logger.info("Listening for JSON-RPC requests on stdin...")
 
         while True:
             try:
@@ -230,6 +233,7 @@ class MCPJSONRPCServer:
                 print(json.dumps(response), flush=True)
 
             except json.JSONDecodeError as e:
+                logger.error(f"JSON parse error: {str(e)}")
                 error_response = {
                     "jsonrpc": "2.0",
                     "id": None,
@@ -240,9 +244,15 @@ class MCPJSONRPCServer:
                 }
                 print(json.dumps(error_response), flush=True)
             except Exception as e:
-                print(f"Server error: {str(e)}", file=sys.stderr)
+                logger.error(f"Server error: {str(e)}")
                 # Continue running even on errors
 
     def close(self):
         """Cleanup resources"""
-        self.connection.close()
+        # Note: connection.close() is async but called from sync context
+        # In practice, tab.stop() is synchronous so it's safe
+        try:
+            if self.connection.tab:
+                self.connection.tab.stop()
+        except:
+            pass
