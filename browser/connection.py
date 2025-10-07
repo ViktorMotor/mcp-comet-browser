@@ -9,27 +9,36 @@ from .cursor import AICursor
 class BrowserConnection:
     """Manages connection to Comet browser via CDP"""
 
-    def __init__(self, debug_port: int = 9222, debug_host: str = None):
+    def __init__(self, debug_port = 9222, debug_host: str = None):
         """Initialize browser connection
 
         Args:
-            debug_port: CDP debug port
-            debug_host: Debug host IP (auto-detects WSL host if None)
+            debug_port: CDP debug port (int) or full URL (str like 'http://host:port')
+            debug_host: Debug host IP (auto-detects WSL host if None, ignored if debug_port is URL)
         """
-        self.debug_port = debug_port
+        # Support both port number and full URL
+        if isinstance(debug_port, str) and debug_port.startswith('http'):
+            # Full URL provided
+            self.debug_url = debug_port
+            self.debug_port = None
+            self.debug_host = None
+        else:
+            # Port number provided
+            self.debug_port = debug_port
+            self.debug_url = None
 
-        # Auto-detect Windows host IP from /etc/resolv.conf in WSL
-        if debug_host is None:
-            try:
-                with open('/etc/resolv.conf', 'r') as f:
-                    for line in f:
-                        if line.startswith('nameserver'):
-                            debug_host = line.split()[1]
-                            break
-            except:
-                pass
+            # Auto-detect Windows host IP from /etc/resolv.conf in WSL
+            if debug_host is None:
+                try:
+                    with open('/etc/resolv.conf', 'r') as f:
+                        for line in f:
+                            if line.startswith('nameserver'):
+                                debug_host = line.split()[1]
+                                break
+                except:
+                    pass
 
-        self.debug_host = debug_host or "127.0.0.1"
+            self.debug_host = debug_host or "127.0.0.1"
         self.browser: Optional[pychrome.Browser] = None
         self.tab: Optional[pychrome.Tab] = None
         self.console_logs = []  # Store console logs from CDP events
@@ -62,7 +71,9 @@ class BrowserConnection:
     async def connect(self):
         """Connect to the existing Comet browser instance"""
         try:
-            self.browser = pychrome.Browser(url=f"http://{self.debug_host}:{self.debug_port}")
+            # Use debug_url if provided, otherwise construct from host:port
+            browser_url = self.debug_url or f"http://{self.debug_host}:{self.debug_port}"
+            self.browser = pychrome.Browser(url=browser_url)
             tabs = self.browser.list_tab()
 
             if not tabs:
@@ -268,7 +279,7 @@ class BrowserConnection:
             print(f"Failed to initialize JS console interceptor: {e}", file=sys.stderr)
             return {"success": False, "error": str(e)}
 
-    def close(self):
+    async def close(self):
         """Close connection to browser"""
         try:
             if self.tab:
