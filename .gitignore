@@ -32,5 +32,8 @@ test_*.html
 test_*.py
 .mcp.json
 
+# Generated files (MCP outputs)
+page_info.json
+
 # Screenshots folder
 screenshots/
