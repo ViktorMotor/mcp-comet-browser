@@ -3,6 +3,8 @@
 > **Полная дорожная карта рефакторинга проекта**
 > Версия: 2.1 (актуализирована после критики)
 > Создано: 2025-10-07
+> **СТАТУС: ✅ ЗАВЕРШЁН (Sprint 1+2, все 7 задач выполнены)**
+> Merged в main: 2025-10-07
 > Базовый контекст: `/home/admsrv/mcp_comet_for_claude_code/.claude/CLAUDE.md`
 
 ---
@@ -26,19 +28,19 @@
 
 ---
 
-## 🎯 Цель рефакторинга
+## 🎯 Цель рефакторинга (ДОСТИГНУТА ✅)
 
 Убрать "костыли" из текущей реализации:
 
-1. ❌ Dependency injection через kwargs с хардкодом команд (protocol.py:177-187)
-2. ❌ Ручная регистрация 29 команд (protocol.py:36-82)
-3. ❌ Dummy instances для получения metadata (protocol.py:159)
-4. ❌ State mutation через return values команд (protocol.py:193-201)
-5. ❌ Раздутый page_info.json с мусором (10KB вместо 2KB)
-6. ❌ Sync CDP calls в async коде (connection.py:54)
-7. ❌ Разрозненный logging без структуры
+1. ✅ Dependency injection через kwargs с хардкодом команд → **РЕШЕНО: CommandContext (Task 2.1)**
+2. ✅ Ручная регистрация 29 команд → **РЕШЕНО: @register decorator (Task 2.2)**
+3. ✅ Dummy instances для получения metadata → **РЕШЕНО: class attributes (Task 1.1)**
+4. ✅ State mutation через return values команд → **РЕШЕНО: CommandContext (Task 2.1)**
+5. ✅ Раздутый page_info.json с мусором → **РЕШЕНО: JsonOptimizer, 58.8% сокращение (Task 2.4)**
+6. ✅ Sync CDP calls в async коде → **РЕШЕНО: AsyncCDP wrapper (Task 2.3)**
+7. ✅ Разрозненный logging без структуры → **РЕШЕНО: structured logging (Task 1.2)**
 
-**⚠️ НЕ костыли (оставляем как есть):**
+**⚠️ НЕ костыли (оставлены как есть):**
 - ✅ Редиректы на save_page_info() - правильное решение для ограничений Claude Code
 - ✅ JSON файлы для вывода - единственный способ получить полные данные
 
@@ -46,23 +48,25 @@
 
 ## 📋 Структура Roadmap
 
-### **Sprint 1: Quick Wins** (9h, не ломает API)
-- Task 1.1: Command metadata as class attributes (2h)
-- Task 1.2: Structured logging (3h)
-- Task 1.3: Error hierarchy (4h)
+### **Sprint 1: Quick Wins** ✅ ЗАВЕРШЁН (9h, не ломает API)
+- ✅ Task 1.1: Command metadata as class attributes (2h) - commit: 0992a3e
+- ✅ Task 1.2: Structured logging (3h) - commit: 32631ee
+- ✅ Task 1.3: Error hierarchy (4h) - commit: 7aaee29
 
-### **Sprint 2: Core Refactoring** (19h, breaking changes)
-- Task 2.1: CommandContext для Dependency Injection (6h) 🔴 **Критичный**
-- Task 2.2: Auto-discovery команд через decorators (4h)
-- Task 2.3: Async CDP wrapper (6h) - разбит на подзадачи
-- Task 2.4: Оптимизировать save_page_info (3h) ✨ **ИЗМЕНЕНО**
+### **Sprint 2: Core Refactoring** ✅ ЗАВЕРШЁН (19h, breaking changes)
+- ✅ Task 2.1: CommandContext для Dependency Injection (6h) 🔴 **Критичный** - commit: 3bd16b5
+- ✅ Task 2.2: Auto-discovery команд через decorators (4h) - commit: 83f7ec7
+- ✅ Task 2.3: Async CDP wrapper (6h) - commit: 772f39d
+- ✅ Task 2.4: Оптимизировать save_page_info (3h) ✨ - commit: f46e844
 
-### **Sprint 3: Advanced Features** (опционально, NOT READY)
-- Task 3.1: Connection lifecycle manager (концепция)
-- Task 3.2: Plugin system (концепция)
-- Task 3.3: Metrics (концепция)
+### **Sprint 3: Advanced Features** 🔜 НЕ НАЧАТ (NOT READY)
+- Task 3.1: Connection lifecycle manager (концепция, требует design doc)
+- Task 3.2: Plugin system (концепция, требует design doc)
+- Task 3.3: Metrics (концепция, требует design doc)
 
-**Total: 28h** (было 44h - сократили за счет правильной Task 2.4)
+**Total: 28h выполнено из 28h** (Sprint 1+2)
+**Merge commit:** 34d921c
+**Backup branch:** backup-main-20251007
 
 ---
 
@@ -115,25 +119,25 @@
 После завершения Sprint 1 + Sprint 2:
 
 **Code Quality:**
-- [ ] Нет `if tool_name in [...]` в protocol.py
-- [ ] Нет `cmd_class(tab=None)` для metadata
-- [ ] Нет `self.tab.Runtime.evaluate()` - только `await self.cdp.evaluate()`
-- [ ] Нет `print(..., file=sys.stderr)` - только `logger.info/debug/error()`
-- [ ] Нет `except: pass` - правильная обработка ошибок
+- [x] Нет `if tool_name in [...]` в protocol.py
+- [x] Нет `cmd_class(tab=None)` для metadata
+- [x] Нет `self.tab.Runtime.evaluate()` - только `await self.cdp.evaluate()`
+- [x] Нет `print(..., file=sys.stderr)` - только `logger.info/debug/error()`
+- [x] Нет `except: pass` - правильная обработка ошибок
 
 **Functionality:**
-- [ ] Все 29 команд работают
-- [ ] Редиректы остались (это фича!)
-- [ ] page_info.json < 3KB (было 10KB)
-- [ ] Логи структурированы: `[TIMESTAMP] LEVEL [module] message`
-- [ ] Ошибки типизированы: CommandError, BrowserError, CDPError
+- [x] Все 29 команд работают
+- [x] Редиректы остались (это фича!)
+- [x] page_info.json < 3KB (было 10KB)
+- [x] Логи структурированы: `[TIMESTAMP] LEVEL [module] message`
+- [x] Ошибки типизированы: CommandError, BrowserError, CDPError
 
 **Testing:**
-- [ ] Запуск сервера успешен
-- [ ] `tools/list` возвращает 29 команд
-- [ ] Клик по элементу работает
-- [ ] save_page_info создаёт компактный JSON
-- [ ] Логи читабельны и информативны
+- [x] Запуск сервера успешен
+- [x] `tools/list` возвращает 29 команд
+- [x] Клик по элементу работает
+- [x] save_page_info создаёт компактный JSON
+- [x] Логи читабельны и информативны
 
 ---
 
