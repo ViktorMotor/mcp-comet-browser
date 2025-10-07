@@ -2,38 +2,37 @@
 import asyncio
 from typing import Dict, Any, Optional
 from .base import Command
+from .registry import register
+from mcp.logging_config import get_logger
+
+logger = get_logger("commands.interaction")
 
 
+@register
 class ClickCommand(Command):
     """Click on an element with multiple search strategies"""
 
-    @property
-    def name(self) -> str:
-        return "click"
+    name = "click"
+    description = "Click on an element matching a CSS selector. Supports XPath (//), text search, and ARIA attributes. Auto-scrolls to element and shows cursor animation."
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "selector": {"type": "string", "description": "CSS selector, XPath (//button), or text content"}
+        },
+        "required": ["selector"]
+    }
 
-    @property
-    def description(self) -> str:
-        return "Click on an element matching a CSS selector. Supports XPath (//), text search, and ARIA attributes. Auto-scrolls to element and shows cursor animation."
+    requires_cursor = True
 
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "selector": {"type": "string", "description": "CSS selector, XPath (//button), or text content"}
-            },
-            "required": ["selector"]
-        }
-
-    async def execute(self, selector: str, show_cursor: bool = True, cursor=None) -> Dict[str, Any]:
+    async def execute(self, selector: str, show_cursor: bool = True, **kwargs) -> Dict[str, Any]:
         """Execute click with multiple strategies and cursor animation"""
         try:
             # Always initialize and show cursor
+            cursor = self.context.cursor
             if cursor:
                 await cursor.initialize()
 
-            import sys
-            print(f"[MCP] click: targeting selector '{selector}' (show_cursor={show_cursor})", file=sys.stderr)
+            logger.debug(f"click: targeting selector '{selector}' (show_cursor={show_cursor})")
 
             js_code = f"""
             (function() {{
@@ -199,13 +198,13 @@ class ClickCommand(Command):
             result = self.tab.Runtime.evaluate(expression=js_code, returnByValue=True, awaitPromise=True)
             click_result = result.get('result', {}).get('value', {})
 
-            # Log result to stderr for debugging
+            # Log result for debugging
             if click_result.get('success'):
                 element_info = click_result.get('elementInfo', {})
-                print(f"[MCP] ✓ Successfully clicked: '{selector}' (element: {element_info.get('tagName', 'unknown')}, strategy: {click_result.get('strategy', 'unknown')})", file=sys.stderr)
+                logger.info(f"✓ Successfully clicked: '{selector}' (element: {element_info.get('tagName', 'unknown')}, strategy: {click_result.get('strategy', 'unknown')})")
                 await asyncio.sleep(0.3)
             else:
-                print(f"[MCP] ✗ Failed to click: '{selector}' - {click_result.get('message', 'unknown error')}", file=sys.stderr)
+                logger.warning(f"✗ Failed to click: '{selector}' - {click_result.get('message', 'unknown error')}")
 
             return click_result
         except Exception as e:
@@ -215,45 +214,40 @@ class ClickCommand(Command):
                 "message": f"Failed to click element: {str(e)}",
                 "error": str(e)
             }
-            print(f"[MCP] ✗ Exception during click: '{selector}' - {str(e)}", file=sys.stderr)
+            logger.error(f"✗ Exception during click: '{selector}' - {str(e)}")
             return error_result
 
 
+@register
 class ClickByTextCommand(Command):
     """Click element by visible text content"""
 
-    @property
-    def name(self) -> str:
-        return "click_by_text"
-
-    @property
-    def description(self) -> str:
-        return """Click element by text. Auto-finds coordinates, moves cursor, clicks. Returns success/failure.
+    name = "click_by_text"
+    description = """Click element by text. Auto-finds coordinates, moves cursor, clicks. Returns success/failure.
 
 Best for: buttons, links, tabs. Auto-scrolls into view if needed.
 Tip: Use save_page_info() first to see available elements and verify click worked."""
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "text": {"type": "string", "description": "Text to search for"},
+            "tag": {"type": "string", "description": "Optional: limit search to specific tag"},
+            "exact": {"type": "boolean", "description": "If true, match exact text", "default": False}
+        },
+        "required": ["text"]
+    }
 
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "text": {"type": "string", "description": "Text to search for"},
-                "tag": {"type": "string", "description": "Optional: limit search to specific tag"},
-                "exact": {"type": "boolean", "description": "If true, match exact text", "default": False}
-            },
-            "required": ["text"]
-        }
+    requires_cursor = True
 
-    async def execute(self, text: str, tag: Optional[str] = None, exact: bool = False, cursor=None) -> Dict[str, Any]:
+    async def execute(self, text: str, tag: Optional[str] = None, exact: bool = False, **kwargs) -> Dict[str, Any]:
         """Execute click by text with cursor animation"""
         try:
             # Always initialize and show cursor
+            cursor = self.context.cursor
             if cursor:
                 await cursor.initialize()
 
-            import sys
-            print(f"[MCP] click_by_text: searching for '{text}' (exact={exact}, tag={tag})", file=sys.stderr)
+            logger.debug(f"click_by_text: searching for '{text}' (exact={exact}, tag={tag})")
 
             # Escape special characters for JavaScript
             import json
@@ -510,9 +504,9 @@ Tip: Use save_page_info() first to see available elements and verify click worke
 
             # Log result to stderr for debugging
             if click_result.get('success'):
-                print(f"[MCP] ✓ Successfully clicked: '{text}' (element: {click_result.get('element', {}).get('tag', 'unknown')}, score: {click_result.get('matchScore', 0)})", file=sys.stderr)
+                logger.info(f"✓ Successfully clicked: '{text}' (element: {click_result.get('element', {}).get('tag', 'unknown')}, score: {click_result.get('matchScore', 0)})")
             else:
-                print(f"[MCP] ✗ Failed to click: '{text}' - {click_result.get('message', 'unknown error')}", file=sys.stderr)
+                logger.warning(f"✗ Failed to click: '{text}' - {click_result.get('message', 'unknown error')}")
 
             return click_result
         except Exception as e:
@@ -521,33 +515,26 @@ Tip: Use save_page_info() first to see available elements and verify click worke
                 "message": f"Failed to click by text: {str(e)}",
                 "error": str(e)
             }
-            print(f"[MCP] ✗ Exception during click: '{text}' - {str(e)}", file=sys.stderr)
+            logger.error(f"✗ Exception during click: '{text}' - {str(e)}")
             return error_result
 
 
+@register
 class ScrollPageCommand(Command):
     """Scroll page or element"""
 
-    @property
-    def name(self) -> str:
-        return "scroll_page"
-
-    @property
-    def description(self) -> str:
-        return "Scroll the page or a specific element. Returns detailed position information."
-
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "direction": {"type": "string", "description": "Scroll direction: 'up', 'down', 'left', 'right', 'top', 'bottom'", "default": "down"},
-                "amount": {"type": "integer", "description": "Pixels to scroll (default: 500 for page, 300 for element)"},
-                "x": {"type": "integer", "description": "Absolute X coordinate to scroll to"},
-                "y": {"type": "integer", "description": "Absolute Y coordinate to scroll to"},
-                "selector": {"type": "string", "description": "CSS selector of element to scroll"}
-            }
+    name = "scroll_page"
+    description = "Scroll the page or a specific element. Returns detailed position information."
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "direction": {"type": "string", "description": "Scroll direction: 'up', 'down', 'left', 'right', 'top', 'bottom'", "default": "down"},
+            "amount": {"type": "integer", "description": "Pixels to scroll (default: 500 for page, 300 for element)"},
+            "x": {"type": "integer", "description": "Absolute X coordinate to scroll to"},
+            "y": {"type": "integer", "description": "Absolute Y coordinate to scroll to"},
+            "selector": {"type": "string", "description": "CSS selector of element to scroll"}
         }
+    }
 
     async def execute(self, direction: str = "down", amount: Optional[int] = None,
                      x: Optional[int] = None, y: Optional[int] = None,
@@ -649,31 +636,26 @@ class ScrollPageCommand(Command):
             raise RuntimeError(f"Failed to scroll page: {str(e)}")
 
 
+@register
 class MoveCursorCommand(Command):
     """Move AI cursor to position"""
 
-    @property
-    def name(self) -> str:
-        return "move_cursor"
-
-    @property
-    def description(self) -> str:
-        return "Move the visual AI cursor to specific coordinates or element center."
-
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "x": {"type": "integer", "description": "X coordinate"},
-                "y": {"type": "integer", "description": "Y coordinate"},
-                "selector": {"type": "string", "description": "CSS selector to move cursor to (element center)"},
-                "duration": {"type": "integer", "description": "Animation duration in ms", "default": 400}
-            }
+    name = "move_cursor"
+    description = "Move the visual AI cursor to specific coordinates or element center."
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "x": {"type": "integer", "description": "X coordinate"},
+            "y": {"type": "integer", "description": "Y coordinate"},
+            "selector": {"type": "string", "description": "CSS selector to move cursor to (element center)"},
+            "duration": {"type": "integer", "description": "Animation duration in ms", "default": 400}
         }
+    }
+
+    requires_cursor = True
 
     async def execute(self, x: Optional[int] = None, y: Optional[int] = None,
-                     selector: Optional[str] = None, duration: int = 400, cursor=None) -> Dict[str, Any]:
+                     selector: Optional[str] = None, duration: int = 400, **kwargs) -> Dict[str, Any]:
         """Execute cursor movement"""
         try:
             if selector:

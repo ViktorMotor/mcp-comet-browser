@@ -4,24 +4,15 @@ import json
 import asyncio
 from typing import Dict, Any
 from browser.connection import BrowserConnection
-from commands.navigation import OpenUrlCommand, GetTextCommand
-from commands.interaction import ClickCommand, ClickByTextCommand, ScrollPageCommand, MoveCursorCommand
-from commands.devtools import (
-    OpenDevtoolsCommand, CloseDevtoolsCommand, ConsoleCommandCommand,
-    GetConsoleLogsCommand, InspectElementCommand, GetNetworkActivityCommand
+from mcp.logging_config import get_logger
+from mcp.errors import (
+    MCPError, ParseError, MethodNotFound, InternalError,
+    BrowserError, CommandError, ValidationError
 )
-from commands.tabs import ListTabsCommand, CreateTabCommand, CloseTabCommand, SwitchTabCommand
-from commands.evaluation import EvaluateJsCommand
-from commands.screenshot import ScreenshotCommand
-from commands.search import FindElementsCommand, GetPageStructureCommand
-from commands.helpers import DebugElementCommand, ForceClickCommand
-from commands.diagnostics import (
-    EnableConsoleLoggingCommand, DiagnosePageCommand, GetClickableElementsCommand
-)
-from commands.open_devtools_url import OpenDevToolsUrlCommand
-from commands.devtools_report import DevToolsReportCommand
-from commands.page_snapshot import PageSnapshotCommand
-from commands.save_page_info import SavePageInfoCommand
+from commands.context import CommandContext
+from commands.registry import CommandRegistry
+
+logger = get_logger("protocol")
 
 
 class MCPJSONRPCServer:
@@ -30,55 +21,10 @@ class MCPJSONRPCServer:
     def __init__(self):
         self.connection = BrowserConnection()
         self.connected = False
-        self.commands = {}
-        self._register_commands()
 
-    def _register_commands(self):
-        """Register all available commands"""
-        # Navigation commands
-        self.commands['open_url'] = OpenUrlCommand
-        self.commands['get_text'] = GetTextCommand
-
-        # Interaction commands
-        self.commands['click'] = ClickCommand
-        self.commands['click_by_text'] = ClickByTextCommand
-        self.commands['scroll_page'] = ScrollPageCommand
-        self.commands['move_cursor'] = MoveCursorCommand
-
-        # DevTools commands
-        self.commands['open_devtools'] = OpenDevtoolsCommand
-        self.commands['close_devtools'] = CloseDevtoolsCommand
-        self.commands['console_command'] = ConsoleCommandCommand
-        self.commands['get_console_logs'] = GetConsoleLogsCommand
-        self.commands['inspect_element'] = InspectElementCommand
-        self.commands['get_network_activity'] = GetNetworkActivityCommand
-
-        # Tab commands
-        self.commands['list_tabs'] = ListTabsCommand
-        self.commands['create_tab'] = CreateTabCommand
-        self.commands['close_tab'] = CloseTabCommand
-        self.commands['switch_tab'] = SwitchTabCommand
-
-        # Evaluation and screenshot
-        self.commands['evaluate_js'] = EvaluateJsCommand
-        self.commands['screenshot'] = ScreenshotCommand
-        self.commands['get_page_snapshot'] = PageSnapshotCommand
-        self.commands['save_page_info'] = SavePageInfoCommand
-
-        # Search and query
-        self.commands['find_elements'] = FindElementsCommand
-        self.commands['get_page_structure'] = GetPageStructureCommand
-
-        # Debugging helpers
-        self.commands['debug_element'] = DebugElementCommand
-        self.commands['force_click'] = ForceClickCommand
-
-        # Diagnostics
-        self.commands['enable_console_logging'] = EnableConsoleLoggingCommand
-        self.commands['diagnose_page'] = DiagnosePageCommand
-        self.commands['get_clickable_elements'] = GetClickableElementsCommand
-        self.commands['open_devtools_ui'] = OpenDevToolsUrlCommand
-        self.commands['devtools_report'] = DevToolsReportCommand
+        # Discover and register all commands automatically
+        CommandRegistry.discover_commands('commands')
+        self.commands = CommandRegistry.get_all_commands()
 
     async def initialize(self):
         """Initialize connection to browser"""
@@ -124,14 +70,7 @@ class MCPJSONRPCServer:
                 tool_params = params.get('arguments', {})
                 result = await self.call_tool(tool_name, tool_params)
             else:
-                return {
-                    "jsonrpc": "2.0",
-                    "id": request_id,
-                    "error": {
-                        "code": -32601,
-                        "message": f"Method not found: {method}"
-                    }
-                }
+                raise MethodNotFound(method)
 
             return {
                 "jsonrpc": "2.0",
@@ -139,52 +78,58 @@ class MCPJSONRPCServer:
                 "result": result
             }
 
-        except Exception as e:
+        except MCPError as e:
+            # Handle typed MCP errors
+            logger.error(f"MCP error: {e.message}")
             return {
                 "jsonrpc": "2.0",
                 "id": request_id,
-                "error": {
-                    "code": -32000,
-                    "message": str(e)
-                }
+                "error": e.to_jsonrpc_error()
+            }
+        except Exception as e:
+            # Handle unexpected errors
+            logger.error(f"Unexpected error: {str(e)}")
+            error = InternalError(str(e))
+            return {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "error": error.to_jsonrpc_error()
             }
 
     def list_tools(self) -> Dict[str, Any]:
         """List available MCP tools"""
         tools = []
 
-        # Instantiate each command temporarily to get its MCP definition
+        # Access metadata as class attributes (no instance needed)
         for cmd_name, cmd_class in self.commands.items():
-            # Create dummy instance (tab will be set later when executing)
-            cmd_instance = cmd_class(tab=None)
-            tools.append(cmd_instance.to_mcp_tool())
+            tools.append(cmd_class.to_mcp_tool())
 
         return {"tools": tools}
 
     async def call_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Call a tool by name with arguments"""
         if tool_name not in self.commands:
-            raise ValueError(f"Unknown tool: {tool_name}")
+            raise ValidationError(
+                f"Unknown tool: {tool_name}",
+                data={"tool_name": tool_name, "available_tools": list(self.commands.keys())}
+            )
 
         # Ensure connection is valid
         await self.connection.ensure_connected()
 
-        # Get command class and instantiate with current tab
-        cmd_class = self.commands[tool_name]
-        cmd_instance = cmd_class(tab=self.connection.tab)
+        # Create execution context with all dependencies
+        context = CommandContext(
+            tab=self.connection.tab,
+            cdp=self.connection.cdp,
+            cursor=self.connection.cursor,
+            browser=self.connection.browser,
+            console_logs=self.connection.console_logs,
+            connection=self.connection
+        )
 
-        # Handle special cases that need extra context
-        if tool_name in ['click', 'click_by_text', 'move_cursor', 'force_click']:
-            arguments['cursor'] = self.connection.cursor
-        elif tool_name == 'open_url':
-            arguments['cursor'] = self.connection.cursor
-        elif tool_name in ['get_console_logs', 'devtools_report']:
-            arguments['console_logs'] = self.connection.console_logs
-        elif tool_name == 'enable_console_logging':
-            arguments['connection'] = self.connection
-        elif tool_name in ['list_tabs', 'create_tab', 'close_tab', 'switch_tab', 'open_devtools_ui']:
-            arguments['browser'] = self.connection.browser
-            arguments['current_tab'] = self.connection.tab
+        # Get command class and instantiate with context
+        cmd_class = self.commands[tool_name]
+        cmd_instance = cmd_class(context=context)
 
         # Execute command
         result = await cmd_instance.execute(**arguments)
@@ -206,9 +151,9 @@ class MCPJSONRPCServer:
         """Main server loop: read from stdin, write to stdout"""
         loop = asyncio.get_event_loop()
 
-        # Log startup to stderr
-        print("MCP Comet Server starting...", file=sys.stderr)
-        print("Listening for JSON-RPC requests on stdin...", file=sys.stderr)
+        # Log startup
+        logger.info("MCP Comet Server starting...")
+        logger.info("Listening for JSON-RPC requests on stdin...")
 
         while True:
             try:
@@ -232,6 +177,7 @@ class MCPJSONRPCServer:
                 print(json.dumps(response), flush=True)
 
             except json.JSONDecodeError as e:
+                logger.error(f"JSON parse error: {str(e)}")
                 error_response = {
                     "jsonrpc": "2.0",
                     "id": None,
@@ -242,9 +188,15 @@ class MCPJSONRPCServer:
                 }
                 print(json.dumps(error_response), flush=True)
             except Exception as e:
-                print(f"Server error: {str(e)}", file=sys.stderr)
+                logger.error(f"Server error: {str(e)}")
                 # Continue running even on errors
 
     def close(self):
         """Cleanup resources"""
-        self.connection.close()
+        # Note: connection.close() is async but called from sync context
+        # In practice, tab.stop() is synchronous so it's safe
+        try:
+            if self.connection.tab:
+                self.connection.tab.stop()
+        except Exception as e:
+            logger.debug(f"Error closing connection: {e}")

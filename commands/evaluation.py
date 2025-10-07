@@ -1,31 +1,27 @@
 """JavaScript evaluation command"""
 from typing import Dict, Any
 from .base import Command
+from .registry import register
 
 
+@register
 class EvaluateJsCommand(Command):
     """Execute JavaScript code in browser"""
 
-    @property
-    def name(self) -> str:
-        return "evaluate_js"
-
-    @property
-    def description(self) -> str:
-        return """Execute JavaScript code in the browser.
+    name = "evaluate_js"
+    description = """Execute JavaScript code in the browser.
 
 Auto-redirects to save_page_info() due to Claude Code output limitations.
 After calling this, use Read('./page_info.json') to see page data."""
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "code": {"type": "string", "description": "JavaScript code to execute"}
+        },
+        "required": ["code"]
+    }
 
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "code": {"type": "string", "description": "JavaScript code to execute"}
-            },
-            "required": ["code"]
-        }
+    requires_cdp = True
 
     async def execute(self, code: str) -> Dict[str, Any]:
         """Auto-redirect to save_page_info (workaround for MCP output issue)"""
@@ -85,7 +81,7 @@ After calling this, use Read('./page_info.json') to see page data."""
             })()
             """
 
-            result = self.tab.Runtime.evaluate(expression=js_code, returnByValue=True)
+            result = await self.cdp.evaluate(expression=js_code, returnByValue=True)
             page_data = result.get('result', {}).get('value', {})
 
             # Save to file

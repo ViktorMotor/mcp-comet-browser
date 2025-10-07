@@ -4,6 +4,11 @@ import asyncio
 from typing import Optional
 import pychrome
 from .cursor import AICursor
+from .async_cdp import AsyncCDP
+from mcp.logging_config import get_logger
+from mcp.errors import ConnectionError as MCPConnectionError, TabStoppedError, BrowserError
+
+logger = get_logger("browser.connection")
 
 
 class BrowserConnection:
@@ -35,12 +40,14 @@ class BrowserConnection:
                             if line.startswith('nameserver'):
                                 debug_host = line.split()[1]
                                 break
-                except:
-                    pass
+                except (FileNotFoundError, PermissionError, IOError):
+                    # Not in WSL or can't read resolv.conf - fallback to localhost
+                    logger.debug("Could not read /etc/resolv.conf, using localhost")
 
             self.debug_host = debug_host or "127.0.0.1"
         self.browser: Optional[pychrome.Browser] = None
         self.tab: Optional[pychrome.Tab] = None
+        self.cdp: Optional[AsyncCDP] = None  # Async CDP wrapper
         self.console_logs = []  # Store console logs from CDP events
         self.cursor: Optional[AICursor] = None
 
@@ -55,18 +62,21 @@ class BrowserConnection:
                     return True
                 except Exception as e:
                     # Tab is dead, need to reconnect
-                    print(f"Tab connection lost: {str(e)}, reconnecting...", file=sys.stderr)
+                    logger.warning(f"Tab connection lost: {str(e)}, reconnecting...")
                     try:
                         self.tab.stop()
-                    except:
-                        pass
+                    except Exception as stop_error:
+                        logger.debug(f"Failed to stop tab: {stop_error}")
                     self.tab = None
 
             # Reconnect to browser
             await self.connect()
             return True
+        except MCPConnectionError:
+            # Re-raise our typed errors
+            raise
         except Exception as e:
-            raise ConnectionError(f"Failed to ensure connection: {str(e)}")
+            raise MCPConnectionError(f"Failed to ensure connection: {str(e)}")
 
     async def connect(self):
         """Connect to the existing Comet browser instance"""
@@ -100,13 +110,26 @@ class BrowserConnection:
             # Initialize JavaScript console interceptor as backup
             await self._initialize_js_console_interceptor()
 
+            # Initialize AsyncCDP wrapper
+            self.cdp = AsyncCDP(self.tab, timeout=30.0)
+            logger.debug("AsyncCDP wrapper initialized")
+
             # Initialize AI cursor
             self.cursor = AICursor(self.tab)
             await self.cursor.initialize()
 
             return True
+        except MCPConnectionError:
+            # Re-raise our typed errors
+            raise
         except Exception as e:
-            raise ConnectionError(f"Failed to connect to browser on port {self.debug_port}: {str(e)}")
+            # Use the browser_url for better error message
+            browser_url = self.debug_url or f"http://{self.debug_host}:{self.debug_port}"
+            raise MCPConnectionError(
+                f"Failed to connect to browser at {browser_url}: {str(e)}",
+                host=self.debug_host,
+                port=self.debug_port
+            )
 
     async def force_enable_console_logging(self):
         """Force re-enable console logging and clear any issues"""
@@ -170,7 +193,7 @@ class BrowserConnection:
 
                 self.console_logs.append(log_entry)
             except Exception as e:
-                print(f"Error handling console message: {e}", file=sys.stderr)
+                logger.error(f"Error handling console message: {e}")
 
         # Subscribe to Console.messageAdded events
         self.tab.Console.messageAdded = console_message_handler
@@ -209,7 +232,7 @@ class BrowserConnection:
 
                 self.console_logs.append(log_entry)
             except Exception as e:
-                print(f"Error handling console API call: {e}", file=sys.stderr)
+                logger.error(f"Error handling console API call: {e}")
 
         # Subscribe to Runtime.consoleAPICalled
         self.tab.set_listener("Runtime.consoleAPICalled", console_api_handler)
@@ -235,7 +258,7 @@ class BrowserConnection:
 
                 self.console_logs.append(log_entry)
             except Exception as e:
-                print(f"Error handling exception: {e}", file=sys.stderr)
+                logger.error(f"Error handling exception: {e}")
 
         self.tab.set_listener("Runtime.exceptionThrown", exception_handler)
 
@@ -276,13 +299,17 @@ class BrowserConnection:
             result = self.tab.Runtime.evaluate(expression=js_code, returnByValue=True)
             return result.get('result', {}).get('value', {})
         except Exception as e:
-            print(f"Failed to initialize JS console interceptor: {e}", file=sys.stderr)
+            logger.error(f"Failed to initialize JS console interceptor: {e}")
             return {"success": False, "error": str(e)}
 
     async def close(self):
         """Close connection to browser"""
         try:
+            # Shutdown AsyncCDP executor first
+            if self.cdp:
+                await self.cdp.close()
+
             if self.tab:
                 self.tab.stop()
-        except:
-            pass
+        except Exception as e:
+            logger.debug(f"Error stopping tab during close: {e}")

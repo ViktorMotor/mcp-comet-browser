@@ -1,29 +1,27 @@
 """Tab management commands: list, create, close, switch"""
 from typing import Dict, Any, Optional
 from .base import Command
+from .registry import register
 
 
+@register
 class ListTabsCommand(Command):
     """List all open browser tabs"""
 
-    @property
-    def name(self) -> str:
-        return "list_tabs"
+    name = "list_tabs"
+    description = "List all open tabs in the browser"
+    input_schema = {
+        "type": "object",
+        "properties": {}
+    }
 
-    @property
-    def description(self) -> str:
-        return "List all open tabs in the browser"
+    requires_browser = True
 
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {}
-        }
-
-    async def execute(self, browser, current_tab) -> Dict[str, Any]:
+    async def execute(self, **kwargs) -> Dict[str, Any]:
         """List all tabs with their info"""
         try:
+            browser = self.context.browser
+            current_tab = self.tab
             tabs = browser.list_tab()
 
             tabs_info = []
@@ -45,29 +43,25 @@ class ListTabsCommand(Command):
             raise RuntimeError(f"Failed to list tabs: {str(e)}")
 
 
+@register
 class CreateTabCommand(Command):
     """Create a new browser tab"""
 
-    @property
-    def name(self) -> str:
-        return "create_tab"
-
-    @property
-    def description(self) -> str:
-        return "Create a new tab and optionally navigate to a URL"
-
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "url": {"type": "string", "description": "URL to open in new tab (optional)"}
-            }
+    name = "create_tab"
+    description = "Create a new tab and optionally navigate to a URL"
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "url": {"type": "string", "description": "URL to open in new tab (optional)"}
         }
+    }
 
-    async def execute(self, browser, url: Optional[str] = None) -> Dict[str, Any]:
+    requires_browser = True
+
+    async def execute(self, url: Optional[str] = None, **kwargs) -> Dict[str, Any]:
         """Create new tab with optional URL"""
         try:
+            browser = self.context.browser
             new_tab = browser.new_tab(url=url)
 
             return {
@@ -80,29 +74,27 @@ class CreateTabCommand(Command):
             raise RuntimeError(f"Failed to create tab: {str(e)}")
 
 
+@register
 class CloseTabCommand(Command):
     """Close a browser tab"""
 
-    @property
-    def name(self) -> str:
-        return "close_tab"
-
-    @property
-    def description(self) -> str:
-        return "Close a tab by ID (closes current tab if no ID provided)"
-
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "tab_id": {"type": "string", "description": "Tab ID to close (optional, defaults to current tab)"}
-            }
+    name = "close_tab"
+    description = "Close a tab by ID (closes current tab if no ID provided)"
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "tab_id": {"type": "string", "description": "Tab ID to close (optional, defaults to current tab)"}
         }
+    }
 
-    async def execute(self, browser, current_tab, tab_id: Optional[str] = None) -> Dict[str, Any]:
+    requires_browser = True
+
+    async def execute(self, tab_id: Optional[str] = None, **kwargs) -> Dict[str, Any]:
         """Close tab by ID or current tab"""
         try:
+            browser = self.context.browser
+            current_tab = self.tab
+
             if tab_id is None:
                 if current_tab:
                     tab_id = getattr(current_tab, 'id', None)
@@ -136,30 +128,28 @@ class CloseTabCommand(Command):
             raise RuntimeError(f"Failed to close tab: {str(e)}")
 
 
+@register
 class SwitchTabCommand(Command):
     """Switch to a different tab"""
 
-    @property
-    def name(self) -> str:
-        return "switch_tab"
+    name = "switch_tab"
+    description = "Switch to a different tab by ID"
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "tab_id": {"type": "string", "description": "Tab ID to switch to"}
+        },
+        "required": ["tab_id"]
+    }
 
-    @property
-    def description(self) -> str:
-        return "Switch to a different tab by ID"
+    requires_browser = True
 
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "tab_id": {"type": "string", "description": "Tab ID to switch to"}
-            },
-            "required": ["tab_id"]
-        }
-
-    async def execute(self, browser, current_tab, tab_id: str) -> Dict[str, Any]:
+    async def execute(self, tab_id: str, **kwargs) -> Dict[str, Any]:
         """Switch to target tab and enable necessary domains"""
         try:
+            browser = self.context.browser
+            current_tab = self.tab
+
             # Find tab by ID
             tabs = browser.list_tab()
             target_tab = None

@@ -1,18 +1,55 @@
 """Base command class for MCP browser commands"""
 from typing import Any, Dict
 from abc import ABC, abstractmethod
+from .context import CommandContext
 
 
 class Command(ABC):
-    """Abstract base class for browser commands"""
+    """Abstract base class for browser commands
 
-    def __init__(self, tab):
-        """Initialize command with browser tab reference
+    Subclasses must define class attributes:
+        name: str - Command name for MCP registration
+        description: str - Command description for MCP
+        input_schema: Dict[str, Any] - JSON schema for command parameters
+
+    Dependency declarations (optional class attributes):
+        requires_cursor: bool = False - Command needs AI cursor
+        requires_browser: bool = False - Command needs browser instance
+        requires_console_logs: bool = False - Command needs console logs
+        requires_connection: bool = False - Command needs full connection
+        requires_cdp: bool = False - Command needs AsyncCDP wrapper
+    """
+
+    # Class attributes - must be overridden by subclasses
+    name: str = None
+    description: str = None
+    input_schema: Dict[str, Any] = None
+
+    # Dependency declarations - optional
+    requires_cursor: bool = False
+    requires_browser: bool = False
+    requires_console_logs: bool = False
+    requires_connection: bool = False
+    requires_cdp: bool = False
+
+    def __init__(self, context: CommandContext):
+        """Initialize command with execution context
 
         Args:
-            tab: pychrome Tab instance
+            context: CommandContext with all dependencies
         """
-        self.tab = tab
+        # Validate required dependencies
+        context.validate_requirements(
+            requires_cursor=self.requires_cursor,
+            requires_browser=self.requires_browser,
+            requires_console_logs=self.requires_console_logs,
+            requires_connection=self.requires_connection,
+            requires_cdp=self.requires_cdp
+        )
+
+        self.context = context
+        self.tab = context.tab  # Backward compatibility
+        self.cdp = context.cdp  # AsyncCDP wrapper
 
     @abstractmethod
     async def execute(self, **kwargs) -> Dict[str, Any]:
@@ -23,28 +60,15 @@ class Command(ABC):
         """
         pass
 
-    @property
-    @abstractmethod
-    def name(self) -> str:
-        """Command name for MCP registration"""
-        pass
+    @classmethod
+    def to_mcp_tool(cls) -> Dict[str, Any]:
+        """Convert command to MCP tool definition
 
-    @property
-    @abstractmethod
-    def description(self) -> str:
-        """Command description for MCP"""
-        pass
-
-    @property
-    @abstractmethod
-    def input_schema(self) -> Dict[str, Any]:
-        """JSON schema for command parameters"""
-        pass
-
-    def to_mcp_tool(self) -> Dict[str, Any]:
-        """Convert command to MCP tool definition"""
+        Returns:
+            Dict with tool definition for MCP protocol
+        """
         return {
-            "name": self.name,
-            "description": self.description,
-            "inputSchema": self.input_schema
+            "name": cls.name,
+            "description": cls.description,
+            "inputSchema": cls.input_schema
         }

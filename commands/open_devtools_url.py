@@ -2,29 +2,28 @@
 import requests
 from typing import Dict, Any
 from .base import Command
+from .registry import register
 
 
+@register
 class OpenDevToolsUrlCommand(Command):
     """Open DevTools UI in a new browser tab"""
 
-    @property
-    def name(self) -> str:
-        return "open_devtools_ui"
+    name = "open_devtools_ui"
+    description = "Open Chrome DevTools UI in a new tab for full debugging access"
+    input_schema = {
+        "type": "object",
+        "properties": {}
+    }
 
-    @property
-    def description(self) -> str:
-        return "Open Chrome DevTools UI in a new tab for full debugging access"
+    requires_browser = True
 
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {}
-        }
-
-    async def execute(self, browser=None, current_tab=None) -> Dict[str, Any]:
+    async def execute(self, **kwargs) -> Dict[str, Any]:
         """Open DevTools UI in new tab"""
         try:
+            browser = self.context.browser
+            current_tab = self.tab
+
             # Get debug host from browser connection
             if hasattr(browser, '_url'):
                 debug_host = browser._url.split('://')[1].split(':')[0]
