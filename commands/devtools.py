@@ -6,20 +6,12 @@ from .base import Command
 class OpenDevtoolsCommand(Command):
     """Open DevTools (F12)"""
 
-    @property
-    def name(self) -> str:
-        return "open_devtools"
-
-    @property
-    def description(self) -> str:
-        return "Open DevTools (F12) in the browser"
-
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {}
-        }
+    name = "open_devtools"
+    description = "Open DevTools (F12) in the browser"
+    input_schema = {
+        "type": "object",
+        "properties": {}
+    }
 
     async def execute(self) -> Dict[str, Any]:
         """Send F12 keyboard event"""
@@ -53,20 +45,12 @@ class OpenDevtoolsCommand(Command):
 class CloseDevtoolsCommand(Command):
     """Close DevTools"""
 
-    @property
-    def name(self) -> str:
-        return "close_devtools"
-
-    @property
-    def description(self) -> str:
-        return "Close DevTools in the browser"
-
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {}
-        }
+    name = "close_devtools"
+    description = "Close DevTools in the browser"
+    input_schema = {
+        "type": "object",
+        "properties": {}
+    }
 
     async def execute(self) -> Dict[str, Any]:
         """Send F12 keyboard event to toggle close"""
@@ -93,23 +77,15 @@ class CloseDevtoolsCommand(Command):
 class ConsoleCommandCommand(Command):
     """Execute console command"""
 
-    @property
-    def name(self) -> str:
-        return "console_command"
-
-    @property
-    def description(self) -> str:
-        return "Execute a command in the DevTools console and get the result"
-
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "command": {"type": "string", "description": "Console command to execute"}
-            },
-            "required": ["command"]
-        }
+    name = "console_command"
+    description = "Execute a command in the DevTools console and get the result"
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "command": {"type": "string", "description": "Console command to execute"}
+        },
+        "required": ["command"]
+    }
 
     async def execute(self, command: str) -> Dict[str, Any]:
         """Execute command in console context"""
@@ -190,25 +166,17 @@ class ConsoleCommandCommand(Command):
 class GetConsoleLogsCommand(Command):
     """Retrieve console logs"""
 
-    @property
-    def name(self) -> str:
-        return "get_console_logs"
-
-    @property
-    def description(self) -> str:
-        return """Get console logs from the browser.
+    name = "get_console_logs"
+    description = """Get console logs from the browser.
 
 Auto-redirects to save_page_info() due to Claude Code output limitations.
 After calling this, use Read('./page_info.json') to see console logs."""
-
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "clear": {"type": "boolean", "description": "Clear logs after retrieving", "default": False}
-            }
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "clear": {"type": "boolean", "description": "Clear logs after retrieving", "default": False}
         }
+    }
 
     async def execute(self, clear: bool = False, console_logs=None) -> Dict[str, Any]:
         """Auto-redirect to save_page_info (workaround for MCP output issue)"""
@@ -307,23 +275,15 @@ After calling this, use Read('./page_info.json') to see console logs."""
 class InspectElementCommand(Command):
     """Inspect element like DevTools"""
 
-    @property
-    def name(self) -> str:
-        return "inspect_element"
-
-    @property
-    def description(self) -> str:
-        return "Inspect an element like DevTools inspector (get HTML, attributes, styles, position)"
-
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "selector": {"type": "string", "description": "CSS selector of element to inspect"}
-            },
-            "required": ["selector"]
-        }
+    name = "inspect_element"
+    description = "Inspect an element like DevTools inspector (get HTML, attributes, styles, position)"
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "selector": {"type": "string", "description": "CSS selector of element to inspect"}
+        },
+        "required": ["selector"]
+    }
 
     async def execute(self, selector: str) -> Dict[str, Any]:
         """Inspect element properties, styles, and position"""
@@ -424,20 +384,12 @@ class InspectElementCommand(Command):
 class GetNetworkActivityCommand(Command):
     """Get network activity"""
 
-    @property
-    def name(self) -> str:
-        return "get_network_activity"
-
-    @property
-    def description(self) -> str:
-        return "Get network activity like DevTools Network panel (resources, timings, sizes)"
-
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {}
-        }
+    name = "get_network_activity"
+    description = "Get network activity like DevTools Network panel (resources, timings, sizes)"
+    input_schema = {
+        "type": "object",
+        "properties": {}
+    }
 
     async def execute(self) -> Dict[str, Any]:
         """Get network activity using Performance API"""

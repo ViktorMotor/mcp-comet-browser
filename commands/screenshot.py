@@ -8,24 +8,16 @@ from .base import Command
 class ScreenshotCommand(Command):
     """Capture page screenshot"""
 
-    @property
-    def name(self) -> str:
-        return "screenshot"
-
-    @property
-    def description(self) -> str:
-        return """Take PNG screenshot of current page. HEAVY (~1800 tokens). Use save_page_info instead when possible (saves 75% tokens).
+    name = "screenshot"
+    description = """Take PNG screenshot of current page. HEAVY (~1800 tokens). Use save_page_info instead when possible (saves 75% tokens).
 
 Auto-saves to ./screenshots/ folder. Use Read tool to view: Read('./screenshots/screenshot.png')"""
-
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "path": {"type": "string", "description": "Path to save screenshot", "default": "./screenshots/screenshot.png"}
-            }
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "path": {"type": "string", "description": "Path to save screenshot", "default": "./screenshots/screenshot.png"}
         }
+    }
 
     async def execute(self, path: str = "./screenshots/screenshot.png") -> Dict[str, Any]:
         """Capture and save screenshot"""

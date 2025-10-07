@@ -6,25 +6,17 @@ from .base import Command
 class DevToolsReportCommand(Command):
     """Generate comprehensive DevTools debugging report"""
 
-    @property
-    def name(self) -> str:
-        return "devtools_report"
-
-    @property
-    def description(self) -> str:
-        return """Generate comprehensive DevTools debugging report.
+    name = "devtools_report"
+    description = """Generate comprehensive DevTools debugging report.
 
 Auto-redirects to save_page_info() due to Claude Code output limitations.
 After calling this, use Read('./page_info.json') to see full report."""
-
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "include_dom": {"type": "boolean", "description": "Include DOM tree snapshot", "default": False}
-            }
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "include_dom": {"type": "boolean", "description": "Include DOM tree snapshot", "default": False}
         }
+    }
 
     async def execute(self, include_dom: bool = False, console_logs=None) -> Dict[str, Any]:
         """Auto-redirect to save_page_info (workaround for MCP output issue)"""

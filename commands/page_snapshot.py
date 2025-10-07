@@ -6,26 +6,18 @@ from .base import Command
 class PageSnapshotCommand(Command):
     """Get lightweight text-based page snapshot instead of heavy screenshot"""
 
-    @property
-    def name(self) -> str:
-        return "get_page_snapshot"
-
-    @property
-    def description(self) -> str:
-        return """Get lightweight text-based page snapshot.
+    name = "get_page_snapshot"
+    description = """Get lightweight text-based page snapshot.
 
 Auto-redirects to save_page_info() due to Claude Code output limitations.
 After calling this, use Read('./page_info.json') to see page snapshot."""
-
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "include_styles": {"type": "boolean", "description": "Include computed styles", "default": False},
-                "max_depth": {"type": "integer", "description": "Max DOM depth to traverse", "default": 3}
-            }
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "include_styles": {"type": "boolean", "description": "Include computed styles", "default": False},
+            "max_depth": {"type": "integer", "description": "Max DOM depth to traverse", "default": 3}
         }
+    }
 
     async def execute(self, include_styles: bool = False, max_depth: int = 3) -> Dict[str, Any]:
         """Auto-redirect to save_page_info (workaround for MCP output issue)"""

@@ -8,26 +8,18 @@ from .base import Command
 class SavePageInfoCommand(Command):
     """Save page snapshot to file (workaround for Claude Code not showing MCP results)"""
 
-    @property
-    def name(self) -> str:
-        return "save_page_info"
-
-    @property
-    def description(self) -> str:
-        return """Save complete page state to JSON file. ALWAYS use Read tool after this to see results!
+    name = "save_page_info"
+    description = """Save complete page state to JSON file. ALWAYS use Read tool after this to see results!
 
 Returns: All interactive elements with coordinates, console logs, network info
 Usage: 1) Call save_page_info() 2) Read('./page_info.json') to see data
 Contains: buttons/links positions, DevTools console (last 10 logs), network requests"""
-
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "output_file": {"type": "string", "description": "Output file path", "default": "./page_info.json"}
-            }
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "output_file": {"type": "string", "description": "Output file path", "default": "./page_info.json"}
         }
+    }
 
     async def execute(self, output_file: str = "./page_info.json") -> Dict[str, Any]:
         """Save page info to file"""

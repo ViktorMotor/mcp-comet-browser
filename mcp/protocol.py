@@ -153,11 +153,9 @@ class MCPJSONRPCServer:
         """List available MCP tools"""
         tools = []
 
-        # Instantiate each command temporarily to get its MCP definition
+        # Access metadata as class attributes (no instance needed)
         for cmd_name, cmd_class in self.commands.items():
-            # Create dummy instance (tab will be set later when executing)
-            cmd_instance = cmd_class(tab=None)
-            tools.append(cmd_instance.to_mcp_tool())
+            tools.append(cmd_class.to_mcp_tool())
 
         return {"tools": tools}
 

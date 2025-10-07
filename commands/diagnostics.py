@@ -6,20 +6,12 @@ from .base import Command
 class EnableConsoleLoggingCommand(Command):
     """Force enable console logging"""
 
-    @property
-    def name(self) -> str:
-        return "enable_console_logging"
-
-    @property
-    def description(self) -> str:
-        return "Force enable console logging if get_console_logs returns empty results"
-
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {}
-        }
+    name = "enable_console_logging"
+    description = "Force enable console logging if get_console_logs returns empty results"
+    input_schema = {
+        "type": "object",
+        "properties": {}
+    }
 
     async def execute(self, connection=None) -> Dict[str, Any]:
         """Force re-enable console logging"""
@@ -33,20 +25,12 @@ class EnableConsoleLoggingCommand(Command):
 class DiagnosePageCommand(Command):
     """Diagnose page state and connection"""
 
-    @property
-    def name(self) -> str:
-        return "diagnose_page"
-
-    @property
-    def description(self) -> str:
-        return "Diagnose page state, connection, and common issues"
-
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {}
-        }
+    name = "diagnose_page"
+    description = "Diagnose page state, connection, and common issues"
+    input_schema = {
+        "type": "object",
+        "properties": {}
+    }
 
     async def execute(self) -> Dict[str, Any]:
         """Run diagnostic checks"""
@@ -103,23 +87,15 @@ class DiagnosePageCommand(Command):
 class GetClickableElementsCommand(Command):
     """Get all clickable elements on page"""
 
-    @property
-    def name(self) -> str:
-        return "get_clickable_elements"
-
-    @property
-    def description(self) -> str:
-        return "Get all clickable elements with their positions (for finding hard-to-click elements)"
-
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "text_filter": {"type": "string", "description": "Filter by text content (optional)"},
-                "visible_only": {"type": "boolean", "description": "Only visible elements", "default": True}
-            }
+    name = "get_clickable_elements"
+    description = "Get all clickable elements with their positions (for finding hard-to-click elements)"
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "text_filter": {"type": "string", "description": "Filter by text content (optional)"},
+            "visible_only": {"type": "boolean", "description": "Only visible elements", "default": True}
         }
+    }
 
     async def execute(self, text_filter: str = None, visible_only: bool = True) -> Dict[str, Any]:
         """Get all clickable elements"""

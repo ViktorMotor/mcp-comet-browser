@@ -6,23 +6,15 @@ from .base import Command
 class DebugElementCommand(Command):
     """Debug element to see all available click methods"""
 
-    @property
-    def name(self) -> str:
-        return "debug_element"
-
-    @property
-    def description(self) -> str:
-        return "Debug an element to see all ways to interact with it (for troubleshooting clicks)"
-
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "text": {"type": "string", "description": "Text to search for"},
-                "selector": {"type": "string", "description": "CSS selector (optional)"}
-            }
+    name = "debug_element"
+    description = "Debug an element to see all ways to interact with it (for troubleshooting clicks)"
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "text": {"type": "string", "description": "Text to search for"},
+            "selector": {"type": "string", "description": "CSS selector (optional)"}
         }
+    }
 
     async def execute(self, text: str = None, selector: str = None) -> Dict[str, Any]:
         """Debug element and return all possible selectors and click methods"""
@@ -132,24 +124,16 @@ class DebugElementCommand(Command):
 class ForceClickCommand(Command):
     """Force click using multiple aggressive strategies"""
 
-    @property
-    def name(self) -> str:
-        return "force_click"
-
-    @property
-    def description(self) -> str:
-        return "Force click on element using all available methods (use when normal click fails)"
-
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "x": {"type": "integer", "description": "X coordinate"},
-                "y": {"type": "integer", "description": "Y coordinate"},
-                "text": {"type": "string", "description": "Text to find (alternative to coordinates)"}
-            }
+    name = "force_click"
+    description = "Force click on element using all available methods (use when normal click fails)"
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "x": {"type": "integer", "description": "X coordinate"},
+            "y": {"type": "integer", "description": "Y coordinate"},
+            "text": {"type": "string", "description": "Text to find (alternative to coordinates)"}
         }
+    }
 
     async def execute(self, x: int = None, y: int = None, text: str = None, cursor=None) -> Dict[str, Any]:
         """Force click at coordinates or on text"""

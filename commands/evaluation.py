@@ -6,26 +6,18 @@ from .base import Command
 class EvaluateJsCommand(Command):
     """Execute JavaScript code in browser"""
 
-    @property
-    def name(self) -> str:
-        return "evaluate_js"
-
-    @property
-    def description(self) -> str:
-        return """Execute JavaScript code in the browser.
+    name = "evaluate_js"
+    description = """Execute JavaScript code in the browser.
 
 Auto-redirects to save_page_info() due to Claude Code output limitations.
 After calling this, use Read('./page_info.json') to see page data."""
-
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "code": {"type": "string", "description": "JavaScript code to execute"}
-            },
-            "required": ["code"]
-        }
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "code": {"type": "string", "description": "JavaScript code to execute"}
+        },
+        "required": ["code"]
+    }
 
     async def execute(self, code: str) -> Dict[str, Any]:
         """Auto-redirect to save_page_info (workaround for MCP output issue)"""

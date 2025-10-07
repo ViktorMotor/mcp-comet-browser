@@ -7,20 +7,12 @@ from .base import Command
 class OpenDevToolsUrlCommand(Command):
     """Open DevTools UI in a new browser tab"""
 
-    @property
-    def name(self) -> str:
-        return "open_devtools_ui"
-
-    @property
-    def description(self) -> str:
-        return "Open Chrome DevTools UI in a new tab for full debugging access"
-
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {}
-        }
+    name = "open_devtools_ui"
+    description = "Open Chrome DevTools UI in a new tab for full debugging access"
+    input_schema = {
+        "type": "object",
+        "properties": {}
+    }
 
     async def execute(self, browser=None, current_tab=None) -> Dict[str, Any]:
         """Open DevTools UI in new tab"""

@@ -7,23 +7,15 @@ from .base import Command
 class OpenUrlCommand(Command):
     """Navigate to a URL"""
 
-    @property
-    def name(self) -> str:
-        return "open_url"
-
-    @property
-    def description(self) -> str:
-        return "Open a URL in the Comet browser"
-
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "url": {"type": "string", "description": "The URL to open"}
-            },
-            "required": ["url"]
-        }
+    name = "open_url"
+    description = "Open a URL in the Comet browser"
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "url": {"type": "string", "description": "The URL to open"}
+        },
+        "required": ["url"]
+    }
 
     async def execute(self, url: str, cursor=None) -> Dict[str, Any]:
         """Navigate to URL and reinitialize cursor"""
@@ -44,23 +36,15 @@ class OpenUrlCommand(Command):
 class GetTextCommand(Command):
     """Extract text from elements"""
 
-    @property
-    def name(self) -> str:
-        return "get_text"
-
-    @property
-    def description(self) -> str:
-        return "Get text content from elements matching a CSS selector"
-
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "selector": {"type": "string", "description": "CSS selector"}
-            },
-            "required": ["selector"]
-        }
+    name = "get_text"
+    description = "Get text content from elements matching a CSS selector"
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "selector": {"type": "string", "description": "CSS selector"}
+        },
+        "required": ["selector"]
+    }
 
     async def execute(self, selector: str) -> Dict[str, Any]:
         """Extract text content from selected element"""

@@ -4,7 +4,18 @@ from abc import ABC, abstractmethod
 
 
 class Command(ABC):
-    """Abstract base class for browser commands"""
+    """Abstract base class for browser commands
+
+    Subclasses must define class attributes:
+        name: str - Command name for MCP registration
+        description: str - Command description for MCP
+        input_schema: Dict[str, Any] - JSON schema for command parameters
+    """
+
+    # Class attributes - must be overridden by subclasses
+    name: str = None
+    description: str = None
+    input_schema: Dict[str, Any] = None
 
     def __init__(self, tab):
         """Initialize command with browser tab reference
@@ -23,28 +34,15 @@ class Command(ABC):
         """
         pass
 
-    @property
-    @abstractmethod
-    def name(self) -> str:
-        """Command name for MCP registration"""
-        pass
+    @classmethod
+    def to_mcp_tool(cls) -> Dict[str, Any]:
+        """Convert command to MCP tool definition
 
-    @property
-    @abstractmethod
-    def description(self) -> str:
-        """Command description for MCP"""
-        pass
-
-    @property
-    @abstractmethod
-    def input_schema(self) -> Dict[str, Any]:
-        """JSON schema for command parameters"""
-        pass
-
-    def to_mcp_tool(self) -> Dict[str, Any]:
-        """Convert command to MCP tool definition"""
+        Returns:
+            Dict with tool definition for MCP protocol
+        """
         return {
-            "name": self.name,
-            "description": self.description,
-            "inputSchema": self.input_schema
+            "name": cls.name,
+            "description": cls.description,
+            "inputSchema": cls.input_schema
         }

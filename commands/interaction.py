@@ -7,23 +7,15 @@ from .base import Command
 class ClickCommand(Command):
     """Click on an element with multiple search strategies"""
 
-    @property
-    def name(self) -> str:
-        return "click"
-
-    @property
-    def description(self) -> str:
-        return "Click on an element matching a CSS selector. Supports XPath (//), text search, and ARIA attributes. Auto-scrolls to element and shows cursor animation."
-
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "selector": {"type": "string", "description": "CSS selector, XPath (//button), or text content"}
-            },
-            "required": ["selector"]
-        }
+    name = "click"
+    description = "Click on an element matching a CSS selector. Supports XPath (//), text search, and ARIA attributes. Auto-scrolls to element and shows cursor animation."
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "selector": {"type": "string", "description": "CSS selector, XPath (//button), or text content"}
+        },
+        "required": ["selector"]
+    }
 
     async def execute(self, selector: str, show_cursor: bool = True, cursor=None) -> Dict[str, Any]:
         """Execute click with multiple strategies and cursor animation"""
@@ -222,28 +214,20 @@ class ClickCommand(Command):
 class ClickByTextCommand(Command):
     """Click element by visible text content"""
 
-    @property
-    def name(self) -> str:
-        return "click_by_text"
-
-    @property
-    def description(self) -> str:
-        return """Click element by text. Auto-finds coordinates, moves cursor, clicks. Returns success/failure.
+    name = "click_by_text"
+    description = """Click element by text. Auto-finds coordinates, moves cursor, clicks. Returns success/failure.
 
 Best for: buttons, links, tabs. Auto-scrolls into view if needed.
 Tip: Use save_page_info() first to see available elements and verify click worked."""
-
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "text": {"type": "string", "description": "Text to search for"},
-                "tag": {"type": "string", "description": "Optional: limit search to specific tag"},
-                "exact": {"type": "boolean", "description": "If true, match exact text", "default": False}
-            },
-            "required": ["text"]
-        }
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "text": {"type": "string", "description": "Text to search for"},
+            "tag": {"type": "string", "description": "Optional: limit search to specific tag"},
+            "exact": {"type": "boolean", "description": "If true, match exact text", "default": False}
+        },
+        "required": ["text"]
+    }
 
     async def execute(self, text: str, tag: Optional[str] = None, exact: bool = False, cursor=None) -> Dict[str, Any]:
         """Execute click by text with cursor animation"""
@@ -528,26 +512,18 @@ Tip: Use save_page_info() first to see available elements and verify click worke
 class ScrollPageCommand(Command):
     """Scroll page or element"""
 
-    @property
-    def name(self) -> str:
-        return "scroll_page"
-
-    @property
-    def description(self) -> str:
-        return "Scroll the page or a specific element. Returns detailed position information."
-
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "direction": {"type": "string", "description": "Scroll direction: 'up', 'down', 'left', 'right', 'top', 'bottom'", "default": "down"},
-                "amount": {"type": "integer", "description": "Pixels to scroll (default: 500 for page, 300 for element)"},
-                "x": {"type": "integer", "description": "Absolute X coordinate to scroll to"},
-                "y": {"type": "integer", "description": "Absolute Y coordinate to scroll to"},
-                "selector": {"type": "string", "description": "CSS selector of element to scroll"}
-            }
+    name = "scroll_page"
+    description = "Scroll the page or a specific element. Returns detailed position information."
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "direction": {"type": "string", "description": "Scroll direction: 'up', 'down', 'left', 'right', 'top', 'bottom'", "default": "down"},
+            "amount": {"type": "integer", "description": "Pixels to scroll (default: 500 for page, 300 for element)"},
+            "x": {"type": "integer", "description": "Absolute X coordinate to scroll to"},
+            "y": {"type": "integer", "description": "Absolute Y coordinate to scroll to"},
+            "selector": {"type": "string", "description": "CSS selector of element to scroll"}
         }
+    }
 
     async def execute(self, direction: str = "down", amount: Optional[int] = None,
                      x: Optional[int] = None, y: Optional[int] = None,
@@ -652,25 +628,17 @@ class ScrollPageCommand(Command):
 class MoveCursorCommand(Command):
     """Move AI cursor to position"""
 
-    @property
-    def name(self) -> str:
-        return "move_cursor"
-
-    @property
-    def description(self) -> str:
-        return "Move the visual AI cursor to specific coordinates or element center."
-
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "x": {"type": "integer", "description": "X coordinate"},
-                "y": {"type": "integer", "description": "Y coordinate"},
-                "selector": {"type": "string", "description": "CSS selector to move cursor to (element center)"},
-                "duration": {"type": "integer", "description": "Animation duration in ms", "default": 400}
-            }
+    name = "move_cursor"
+    description = "Move the visual AI cursor to specific coordinates or element center."
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "x": {"type": "integer", "description": "X coordinate"},
+            "y": {"type": "integer", "description": "Y coordinate"},
+            "selector": {"type": "string", "description": "CSS selector to move cursor to (element center)"},
+            "duration": {"type": "integer", "description": "Animation duration in ms", "default": 400}
         }
+    }
 
     async def execute(self, x: Optional[int] = None, y: Optional[int] = None,
                      selector: Optional[str] = None, duration: int = 400, cursor=None) -> Dict[str, Any]:
