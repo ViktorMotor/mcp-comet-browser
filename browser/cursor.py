@@ -1,6 +1,9 @@
 """Visual AI cursor overlay management"""
 import sys
 from typing import Dict, Any
+from mcp.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class AICursor:
@@ -88,7 +91,7 @@ class AICursor:
             self._initialized = True
             return result.get('result', {}).get('value', {})
         except Exception as e:
-            print(f"Failed to initialize AI cursor: {e}", file=sys.stderr)
+            logger.error(f"Failed to initialize AI cursor: {e}", exc_info=True)
             return {"success": False, "error": str(e)}
 
     async def move(self, x: int, y: int, duration: int = 400) -> Dict[str, Any]:
