@@ -4,6 +4,7 @@ import asyncio
 from typing import Optional
 import pychrome
 from .cursor import AICursor
+from .async_cdp import AsyncCDP
 from mcp.logging_config import get_logger
 from mcp.errors import ConnectionError as MCPConnectionError, TabStoppedError, BrowserError
 
@@ -46,6 +47,7 @@ class BrowserConnection:
             self.debug_host = debug_host or "127.0.0.1"
         self.browser: Optional[pychrome.Browser] = None
         self.tab: Optional[pychrome.Tab] = None
+        self.cdp: Optional[AsyncCDP] = None  # Async CDP wrapper
         self.console_logs = []  # Store console logs from CDP events
         self.cursor: Optional[AICursor] = None
 
@@ -107,6 +109,10 @@ class BrowserConnection:
 
             # Initialize JavaScript console interceptor as backup
             await self._initialize_js_console_interceptor()
+
+            # Initialize AsyncCDP wrapper
+            self.cdp = AsyncCDP(self.tab, timeout=30.0)
+            logger.debug("AsyncCDP wrapper initialized")
 
             # Initialize AI cursor
             self.cursor = AICursor(self.tab)
@@ -299,6 +305,10 @@ class BrowserConnection:
     async def close(self):
         """Close connection to browser"""
         try:
+            # Shutdown AsyncCDP executor first
+            if self.cdp:
+                await self.cdp.close()
+
             if self.tab:
                 self.tab.stop()
         except Exception as e:

@@ -21,13 +21,15 @@ Auto-saves to ./screenshots/ folder. Use Read tool to view: Read('./screenshots/
         }
     }
 
+    requires_cdp = True
+
     async def execute(self, path: str = "./screenshots/screenshot.png") -> Dict[str, Any]:
         """Capture and save screenshot"""
         try:
             # Create screenshots directory if it doesn't exist
             os.makedirs(os.path.dirname(path), exist_ok=True)
 
-            result = self.tab.Page.captureScreenshot(format='png')
+            result = await self.cdp.capture_screenshot(format='png')
             img_data = result.get('data', '')
 
             # Decode base64 and save to file

@@ -120,6 +120,7 @@ class MCPJSONRPCServer:
         # Create execution context with all dependencies
         context = CommandContext(
             tab=self.connection.tab,
+            cdp=self.connection.cdp,
             cursor=self.connection.cursor,
             browser=self.connection.browser,
             console_logs=self.connection.console_logs,

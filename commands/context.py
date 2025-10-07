@@ -17,6 +17,7 @@ class CommandContext:
 
     Provides all dependencies a command might need:
     - tab: Chrome DevTools Protocol tab instance
+    - cdp: Async CDP wrapper for safe async calls
     - cursor: AI cursor for visual feedback
     - browser: Browser instance for tab management
     - console_logs: Console log history
@@ -24,6 +25,7 @@ class CommandContext:
     """
 
     tab: pychrome.Tab
+    cdp: Optional[Any] = None  # AsyncCDP wrapper
     cursor: Optional[Any] = None
     browser: Optional[pychrome.Browser] = None
     console_logs: Optional[List[Dict[str, Any]]] = None
@@ -34,7 +36,8 @@ class CommandContext:
         requires_cursor: bool = False,
         requires_browser: bool = False,
         requires_console_logs: bool = False,
-        requires_connection: bool = False
+        requires_connection: bool = False,
+        requires_cdp: bool = False
     ):
         """
         Validate that all required dependencies are present.
@@ -44,6 +47,7 @@ class CommandContext:
             requires_browser: Command needs browser instance
             requires_console_logs: Command needs console logs
             requires_connection: Command needs full connection
+            requires_cdp: Command needs async CDP wrapper
 
         Raises:
             ValueError: If required dependency is missing
@@ -59,6 +63,9 @@ class CommandContext:
 
         if requires_connection and self.connection is None:
             raise ValueError("Command requires connection but none provided in context")
+
+        if requires_cdp and self.cdp is None:
+            raise ValueError("Command requires cdp but none provided in context")
 
     def get_cursor(self):
         """Get cursor with validation"""
@@ -83,3 +90,9 @@ class CommandContext:
         if self.connection is None:
             raise ValueError("Connection not available in context")
         return self.connection
+
+    def get_cdp(self):
+        """Get AsyncCDP wrapper with validation"""
+        if self.cdp is None:
+            raise ValueError("AsyncCDP wrapper not available in context")
+        return self.cdp

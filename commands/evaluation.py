@@ -21,6 +21,8 @@ After calling this, use Read('./page_info.json') to see page data."""
         "required": ["code"]
     }
 
+    requires_cdp = True
+
     async def execute(self, code: str) -> Dict[str, Any]:
         """Auto-redirect to save_page_info (workaround for MCP output issue)"""
         import json
@@ -79,7 +81,7 @@ After calling this, use Read('./page_info.json') to see page data."""
             })()
             """
 
-            result = self.tab.Runtime.evaluate(expression=js_code, returnByValue=True)
+            result = await self.cdp.evaluate(expression=js_code, returnByValue=True)
             page_data = result.get('result', {}).get('value', {})
 
             # Save to file

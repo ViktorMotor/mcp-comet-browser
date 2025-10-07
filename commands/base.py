@@ -17,6 +17,7 @@ class Command(ABC):
         requires_browser: bool = False - Command needs browser instance
         requires_console_logs: bool = False - Command needs console logs
         requires_connection: bool = False - Command needs full connection
+        requires_cdp: bool = False - Command needs AsyncCDP wrapper
     """
 
     # Class attributes - must be overridden by subclasses
@@ -29,6 +30,7 @@ class Command(ABC):
     requires_browser: bool = False
     requires_console_logs: bool = False
     requires_connection: bool = False
+    requires_cdp: bool = False
 
     def __init__(self, context: CommandContext):
         """Initialize command with execution context
@@ -41,11 +43,13 @@ class Command(ABC):
             requires_cursor=self.requires_cursor,
             requires_browser=self.requires_browser,
             requires_console_logs=self.requires_console_logs,
-            requires_connection=self.requires_connection
+            requires_connection=self.requires_connection,
+            requires_cdp=self.requires_cdp
         )
 
         self.context = context
         self.tab = context.tab  # Backward compatibility
+        self.cdp = context.cdp  # AsyncCDP wrapper
 
     @abstractmethod
     async def execute(self, **kwargs) -> Dict[str, Any]:
