@@ -241,64 +241,151 @@ Tip: Use save_page_info() first to see available elements and verify click worke
             if cursor:
                 await cursor.initialize()
 
-            match_method = "===" if exact else "includes"
+            # Escape special characters for JavaScript
+            import json
+            text_escaped = json.dumps(text)
 
             if tag:
-                tags_js = f"['{tag}']"
+                tags_js = json.dumps([tag])
             else:
-                # Expanded list to include divs and spans that might be clickable
-                tags_js = "['button', 'a', '[role=\"button\"]', '[role=\"tab\"]', 'input[type=\"button\"]', 'input[type=\"submit\"]', '[onclick]', 'div[onclick]', 'span[onclick]', 'div[role]', 'span[role]']"
+                # Comprehensive list of clickable elements
+                tags_js = json.dumps([
+                    'button', 'a', 'input[type="button"]', 'input[type="submit"]',
+                    '[role="button"]', '[role="tab"]', '[role="link"]', '[role="menuitem"]',
+                    '[onclick]', 'div[onclick]', 'span[onclick]', 'li[onclick]',
+                    'div[role]', 'span[role]', '.btn', '.button', '[tabindex]'
+                ])
 
             js_code = f"""
             (function() {{
                 const tags = {tags_js};
                 const selector = tags.join(', ');
                 const elements = Array.from(document.querySelectorAll(selector));
+                const searchText = {text_escaped};
+                const exactMatch = {str(exact).lower()};
 
-                const searchText = '{text}';
+                // Normalize text function - removes extra whitespace and normalizes
+                function normalizeText(text) {{
+                    return text.replace(/\\s+/g, ' ').trim().toLowerCase();
+                }}
 
-                // Find element with better filtering - only visible and clickable
-                const el = elements.find(e => {{
-                    const rect = e.getBoundingClientRect();
-                    const isVisible = rect.width > 0 && rect.height > 0 &&
-                                     e.offsetParent !== null &&
-                                     window.getComputedStyle(e).visibility !== 'hidden';
+                // Check if element is truly visible and clickable
+                function isElementVisible(el) {{
+                    const rect = el.getBoundingClientRect();
+                    const style = window.getComputedStyle(el);
 
-                    const textMatch = (e.textContent.trim() {match_method} searchText) ||
-                                     (e.getAttribute('aria-label') {match_method} searchText) ||
-                                     (e.title {match_method} searchText) ||
-                                     (e.value {match_method} searchText);
+                    return rect.width > 0 &&
+                           rect.height > 0 &&
+                           style.display !== 'none' &&
+                           style.visibility !== 'hidden' &&
+                           style.opacity !== '0' &&
+                           el.offsetParent !== null;
+                }}
 
-                    return isVisible && textMatch;
-                }});
+                // Get direct text content (without nested elements)
+                function getDirectText(el) {{
+                    let text = '';
+                    for (let node of el.childNodes) {{
+                        if (node.nodeType === Node.TEXT_NODE) {{
+                            text += node.textContent;
+                        }}
+                    }}
+                    return text.trim();
+                }}
+
+                // Find best matching element
+                const searchNorm = normalizeText(searchText);
+                let bestMatch = null;
+                let bestScore = 0;
+
+                for (const el of elements) {{
+                    if (!isElementVisible(el)) continue;
+
+                    // Get various text representations
+                    const fullText = normalizeText(el.textContent || '');
+                    const directText = normalizeText(getDirectText(el));
+                    const ariaLabel = normalizeText(el.getAttribute('aria-label') || '');
+                    const title = normalizeText(el.title || '');
+                    const value = normalizeText(el.value || '');
+                    const placeholder = normalizeText(el.placeholder || '');
+
+                    let score = 0;
+                    let matched = false;
+
+                    if (exactMatch) {{
+                        // Exact match mode
+                        if (fullText === searchNorm || directText === searchNorm ||
+                            ariaLabel === searchNorm || title === searchNorm ||
+                            value === searchNorm || placeholder === searchNorm) {{
+                            matched = true;
+                            score = 100;
+                            // Prefer elements with less nested content
+                            if (directText === searchNorm) score += 50;
+                        }}
+                    }} else {{
+                        // Partial match mode
+                        if (fullText.includes(searchNorm)) {{
+                            matched = true;
+                            score = 50;
+                            // Prefer direct text match
+                            if (directText.includes(searchNorm)) score += 30;
+                            // Prefer shorter text (more specific)
+                            if (fullText.length < 100) score += 10;
+                        }}
+                        if (ariaLabel.includes(searchNorm)) {{
+                            matched = true;
+                            score = Math.max(score, 70);
+                        }}
+                        if (title.includes(searchNorm)) {{
+                            matched = true;
+                            score = Math.max(score, 60);
+                        }}
+                        if (value.includes(searchNorm)) {{
+                            matched = true;
+                            score = Math.max(score, 80);
+                        }}
+                        if (placeholder.includes(searchNorm)) {{
+                            matched = true;
+                            score = Math.max(score, 40);
+                        }}
+                    }}
+
+                    if (matched && score > bestScore) {{
+                        bestScore = score;
+                        bestMatch = el;
+                    }}
+                }}
+
+                const el = bestMatch;
 
                 if (!el) {{
-                    // Debug: show what we found
-                    const allMatches = elements.filter(e =>
-                        (e.textContent.trim() {match_method} searchText) ||
-                        (e.getAttribute('aria-label') {match_method} searchText)
-                    );
+                    // Better debug information
+                    const visibleElements = elements.filter(isElementVisible);
+                    const partialMatches = visibleElements.filter(e => {{
+                        const text = normalizeText(e.textContent || '');
+                        return text.includes(searchNorm) || searchNorm.includes(text);
+                    }});
+
                     return {{
                         success: false,
-                        message: 'Element with text not found: {text}',
+                        message: `Element with text not found: "${{searchText}}"`,
                         searchedTags: tags,
                         totalElements: elements.length,
-                        matchedButHidden: allMatches.length,
-                        availableTexts: elements.slice(0, 10).map(e => e.textContent.trim().substring(0, 50))
+                        visibleElements: visibleElements.length,
+                        partialMatches: partialMatches.length,
+                        availableTexts: visibleElements.slice(0, 15).map(e => ({{
+                            tag: e.tagName,
+                            text: e.textContent.trim().substring(0, 60),
+                            ariaLabel: e.getAttribute('aria-label'),
+                            role: e.getAttribute('role')
+                        }}))
                     }};
                 }}
 
+                // Scroll into view if needed
                 const rect = el.getBoundingClientRect();
-                const clickX = Math.round(rect.left + rect.width / 2);
-                const clickY = Math.round(rect.top + rect.height / 2);
-
-                // Debug logging
-                console.log('[MCP] Click target:', {{
-                    text: '{text}',
-                    tag: el.tagName,
-                    coords: {{ x: clickX, y: clickY }},
-                    rect: {{ left: rect.left, top: rect.top, width: rect.width, height: rect.height }}
-                }});
+                let clickX = Math.round(rect.left + rect.width / 2);
+                let clickY = Math.round(rect.top + rect.height / 2);
 
                 const inViewport = rect.top >= 0 && rect.left >= 0 &&
                                   rect.bottom <= window.innerHeight &&
@@ -313,6 +400,17 @@ Tip: Use save_page_info() first to see available elements and verify click worke
                     clickY = Math.round(newRect.top + newRect.height / 2);
                 }}
 
+                // Debug logging
+                console.log('[MCP] Click target:', {{
+                    searchText: searchText,
+                    foundText: el.textContent.trim().substring(0, 100),
+                    tag: el.tagName,
+                    score: bestScore,
+                    coords: {{ x: clickX, y: clickY }},
+                    rect: {{ left: rect.left, top: rect.top, width: rect.width, height: rect.height }}
+                }});
+
+                // Animate cursor
                 if (window.__moveAICursor__) {{
                     window.__moveAICursor__(clickX, clickY, 400);
                 }}
@@ -324,29 +422,60 @@ Tip: Use save_page_info() first to see available elements and verify click worke
                                 window.__clickAICursor__();
                             }}
 
-                            el.click();
+                            // Try multiple click methods
+                            let clicked = false;
 
-                            ['mousedown', 'mouseup', 'click'].forEach(eventType => {{
-                                const event = new MouseEvent(eventType, {{
-                                    view: window,
-                                    bubbles: true,
-                                    cancelable: true,
-                                    clientX: clickX,
-                                    clientY: clickY
+                            // Method 1: Direct click
+                            try {{
+                                el.click();
+                                clicked = true;
+                            }} catch (e1) {{
+                                console.warn('[MCP] Direct click failed:', e1);
+                            }}
+
+                            // Method 2: Dispatch mouse events
+                            try {{
+                                ['mousedown', 'mouseup', 'click'].forEach(eventType => {{
+                                    const event = new MouseEvent(eventType, {{
+                                        view: window,
+                                        bubbles: true,
+                                        cancelable: true,
+                                        clientX: clickX,
+                                        clientY: clickY
+                                    }});
+                                    el.dispatchEvent(event);
                                 }});
-                                el.dispatchEvent(event);
-                            }});
+                                clicked = true;
+                            }} catch (e2) {{
+                                console.warn('[MCP] Mouse events failed:', e2);
+                            }}
+
+                            // Method 3: Focus and trigger onclick
+                            if (el.tagName === 'BUTTON' || el.tagName === 'A' || el.tagName === 'INPUT') {{
+                                try {{
+                                    el.focus();
+                                    if (el.onclick) {{
+                                        el.onclick.call(el);
+                                        clicked = true;
+                                    }}
+                                }} catch (e3) {{
+                                    console.warn('[MCP] Focus/onclick failed:', e3);
+                                }}
+                            }}
 
                             resolve({{
-                                success: true,
-                                text: '{text}',
-                                message: 'Clicked element with text: {text}',
+                                success: clicked,
+                                searchText: searchText,
+                                matchScore: bestScore,
+                                message: clicked ? `Clicked element with text: "${{searchText}}"` : 'All click methods failed',
                                 cursorVisible: window.__aiCursor__ && window.__aiCursor__.style.display !== 'none',
                                 element: {{
                                     tag: el.tagName,
                                     id: el.id,
                                     className: el.className,
                                     actualText: el.textContent.trim().substring(0, 100),
+                                    ariaLabel: el.getAttribute('aria-label'),
+                                    role: el.getAttribute('role'),
                                     position: {{ x: clickX, y: clickY }}
                                 }}
                             }});
