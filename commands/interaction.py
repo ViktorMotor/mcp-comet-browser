@@ -28,9 +28,12 @@ class ClickCommand(Command):
     async def execute(self, selector: str, show_cursor: bool = True, cursor=None) -> Dict[str, Any]:
         """Execute click with multiple strategies and cursor animation"""
         try:
-            # Re-initialize cursor if provided
+            # Always initialize and show cursor
             if cursor:
                 await cursor.initialize()
+
+            import sys
+            print(f"[MCP] click: targeting selector '{selector}' (show_cursor={show_cursor})", file=sys.stderr)
 
             js_code = f"""
             (function() {{
@@ -196,17 +199,24 @@ class ClickCommand(Command):
             result = self.tab.Runtime.evaluate(expression=js_code, returnByValue=True, awaitPromise=True)
             click_result = result.get('result', {}).get('value', {})
 
+            # Log result to stderr for debugging
             if click_result.get('success'):
+                element_info = click_result.get('elementInfo', {})
+                print(f"[MCP] ✓ Successfully clicked: '{selector}' (element: {element_info.get('tagName', 'unknown')}, strategy: {click_result.get('strategy', 'unknown')})", file=sys.stderr)
                 await asyncio.sleep(0.3)
+            else:
+                print(f"[MCP] ✗ Failed to click: '{selector}' - {click_result.get('message', 'unknown error')}", file=sys.stderr)
 
             return click_result
         except Exception as e:
-            return {
+            error_result = {
                 "success": False,
                 "reason": "exception",
                 "message": f"Failed to click element: {str(e)}",
                 "error": str(e)
             }
+            print(f"[MCP] ✗ Exception during click: '{selector}' - {str(e)}", file=sys.stderr)
+            return error_result
 
 
 class ClickByTextCommand(Command):
@@ -238,8 +248,12 @@ Tip: Use save_page_info() first to see available elements and verify click worke
     async def execute(self, text: str, tag: Optional[str] = None, exact: bool = False, cursor=None) -> Dict[str, Any]:
         """Execute click by text with cursor animation"""
         try:
+            # Always initialize and show cursor
             if cursor:
                 await cursor.initialize()
+
+            import sys
+            print(f"[MCP] click_by_text: searching for '{text}' (exact={exact}, tag={tag})", file=sys.stderr)
 
             # Escape special characters for JavaScript
             import json
@@ -492,13 +506,23 @@ Tip: Use save_page_info() first to see available elements and verify click worke
             """
 
             result = self.tab.Runtime.evaluate(expression=js_code, returnByValue=True, awaitPromise=True)
-            return result.get('result', {}).get('value', {})
+            click_result = result.get('result', {}).get('value', {})
+
+            # Log result to stderr for debugging
+            if click_result.get('success'):
+                print(f"[MCP] ✓ Successfully clicked: '{text}' (element: {click_result.get('element', {}).get('tag', 'unknown')}, score: {click_result.get('matchScore', 0)})", file=sys.stderr)
+            else:
+                print(f"[MCP] ✗ Failed to click: '{text}' - {click_result.get('message', 'unknown error')}", file=sys.stderr)
+
+            return click_result
         except Exception as e:
-            return {
+            error_result = {
                 "success": False,
                 "message": f"Failed to click by text: {str(e)}",
                 "error": str(e)
             }
+            print(f"[MCP] ✗ Exception during click: '{text}' - {str(e)}", file=sys.stderr)
+            return error_result
 
 
 class ScrollPageCommand(Command):
