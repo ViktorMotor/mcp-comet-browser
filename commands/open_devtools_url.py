@@ -2,8 +2,10 @@
 import requests
 from typing import Dict, Any
 from .base import Command
+from .registry import register
 
 
+@register
 class OpenDevToolsUrlCommand(Command):
     """Open DevTools UI in a new browser tab"""
 

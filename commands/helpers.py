@@ -1,8 +1,10 @@
 """Helper commands for debugging and advanced interactions"""
 from typing import Dict, Any
 from .base import Command
+from .registry import register
 
 
+@register
 class DebugElementCommand(Command):
     """Debug element to see all available click methods"""
 
@@ -121,6 +123,7 @@ class DebugElementCommand(Command):
             }
 
 
+@register
 class ForceClickCommand(Command):
     """Force click using multiple aggressive strategies"""
 

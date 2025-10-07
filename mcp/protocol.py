@@ -10,26 +10,9 @@ from mcp.errors import (
     BrowserError, CommandError, ValidationError
 )
 from commands.context import CommandContext
+from commands.registry import CommandRegistry
 
 logger = get_logger("protocol")
-from commands.navigation import OpenUrlCommand, GetTextCommand
-from commands.interaction import ClickCommand, ClickByTextCommand, ScrollPageCommand, MoveCursorCommand
-from commands.devtools import (
-    OpenDevtoolsCommand, CloseDevtoolsCommand, ConsoleCommandCommand,
-    GetConsoleLogsCommand, InspectElementCommand, GetNetworkActivityCommand
-)
-from commands.tabs import ListTabsCommand, CreateTabCommand, CloseTabCommand, SwitchTabCommand
-from commands.evaluation import EvaluateJsCommand
-from commands.screenshot import ScreenshotCommand
-from commands.search import FindElementsCommand, GetPageStructureCommand
-from commands.helpers import DebugElementCommand, ForceClickCommand
-from commands.diagnostics import (
-    EnableConsoleLoggingCommand, DiagnosePageCommand, GetClickableElementsCommand
-)
-from commands.open_devtools_url import OpenDevToolsUrlCommand
-from commands.devtools_report import DevToolsReportCommand
-from commands.page_snapshot import PageSnapshotCommand
-from commands.save_page_info import SavePageInfoCommand
 
 
 class MCPJSONRPCServer:
@@ -38,55 +21,10 @@ class MCPJSONRPCServer:
     def __init__(self):
         self.connection = BrowserConnection()
         self.connected = False
-        self.commands = {}
-        self._register_commands()
 
-    def _register_commands(self):
-        """Register all available commands"""
-        # Navigation commands
-        self.commands['open_url'] = OpenUrlCommand
-        self.commands['get_text'] = GetTextCommand
-
-        # Interaction commands
-        self.commands['click'] = ClickCommand
-        self.commands['click_by_text'] = ClickByTextCommand
-        self.commands['scroll_page'] = ScrollPageCommand
-        self.commands['move_cursor'] = MoveCursorCommand
-
-        # DevTools commands
-        self.commands['open_devtools'] = OpenDevtoolsCommand
-        self.commands['close_devtools'] = CloseDevtoolsCommand
-        self.commands['console_command'] = ConsoleCommandCommand
-        self.commands['get_console_logs'] = GetConsoleLogsCommand
-        self.commands['inspect_element'] = InspectElementCommand
-        self.commands['get_network_activity'] = GetNetworkActivityCommand
-
-        # Tab commands
-        self.commands['list_tabs'] = ListTabsCommand
-        self.commands['create_tab'] = CreateTabCommand
-        self.commands['close_tab'] = CloseTabCommand
-        self.commands['switch_tab'] = SwitchTabCommand
-
-        # Evaluation and screenshot
-        self.commands['evaluate_js'] = EvaluateJsCommand
-        self.commands['screenshot'] = ScreenshotCommand
-        self.commands['get_page_snapshot'] = PageSnapshotCommand
-        self.commands['save_page_info'] = SavePageInfoCommand
-
-        # Search and query
-        self.commands['find_elements'] = FindElementsCommand
-        self.commands['get_page_structure'] = GetPageStructureCommand
-
-        # Debugging helpers
-        self.commands['debug_element'] = DebugElementCommand
-        self.commands['force_click'] = ForceClickCommand
-
-        # Diagnostics
-        self.commands['enable_console_logging'] = EnableConsoleLoggingCommand
-        self.commands['diagnose_page'] = DiagnosePageCommand
-        self.commands['get_clickable_elements'] = GetClickableElementsCommand
-        self.commands['open_devtools_ui'] = OpenDevToolsUrlCommand
-        self.commands['devtools_report'] = DevToolsReportCommand
+        # Discover and register all commands automatically
+        CommandRegistry.discover_commands('commands')
+        self.commands = CommandRegistry.get_all_commands()
 
     async def initialize(self):
         """Initialize connection to browser"""

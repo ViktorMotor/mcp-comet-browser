@@ -1,8 +1,10 @@
 """DevTools commands: console, network, element inspection"""
 from typing import Dict, Any, Optional
 from .base import Command
+from .registry import register
 
 
+@register
 class OpenDevtoolsCommand(Command):
     """Open DevTools (F12)"""
 
@@ -42,6 +44,7 @@ class OpenDevtoolsCommand(Command):
             raise RuntimeError(f"Failed to open DevTools: {str(e)}")
 
 
+@register
 class CloseDevtoolsCommand(Command):
     """Close DevTools"""
 
@@ -74,6 +77,7 @@ class CloseDevtoolsCommand(Command):
             raise RuntimeError(f"Failed to close DevTools: {str(e)}")
 
 
+@register
 class ConsoleCommandCommand(Command):
     """Execute console command"""
 
@@ -163,6 +167,7 @@ class ConsoleCommandCommand(Command):
             raise RuntimeError(f"Failed to execute console command: {error_msg}")
 
 
+@register
 class GetConsoleLogsCommand(Command):
     """Retrieve console logs"""
 
@@ -274,6 +279,7 @@ After calling this, use Read('./page_info.json') to see console logs."""
             }
 
 
+@register
 class InspectElementCommand(Command):
     """Inspect element like DevTools"""
 
@@ -383,6 +389,7 @@ class InspectElementCommand(Command):
             }
 
 
+@register
 class GetNetworkActivityCommand(Command):
     """Get network activity"""
 

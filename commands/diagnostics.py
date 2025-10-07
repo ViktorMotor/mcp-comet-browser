@@ -1,8 +1,10 @@
 """Diagnostic commands for troubleshooting"""
 from typing import Dict, Any
 from .base import Command
+from .registry import register
 
 
+@register
 class EnableConsoleLoggingCommand(Command):
     """Force enable console logging"""
 
@@ -25,6 +27,7 @@ class EnableConsoleLoggingCommand(Command):
         return result
 
 
+@register
 class DiagnosePageCommand(Command):
     """Diagnose page state and connection"""
 
@@ -87,6 +90,7 @@ class DiagnosePageCommand(Command):
             }
 
 
+@register
 class GetClickableElementsCommand(Command):
     """Get all clickable elements on page"""
 

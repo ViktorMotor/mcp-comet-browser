@@ -3,8 +3,10 @@ import base64
 import os
 from typing import Dict, Any
 from .base import Command
+from .registry import register
 
 
+@register
 class ScreenshotCommand(Command):
     """Capture page screenshot"""
 

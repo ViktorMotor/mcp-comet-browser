@@ -3,8 +3,10 @@ import json
 import os
 from typing import Dict, Any
 from .base import Command
+from .registry import register
 
 
+@register
 class SavePageInfoCommand(Command):
     """Save page snapshot to file (workaround for Claude Code not showing MCP results)"""
 

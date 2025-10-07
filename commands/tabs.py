@@ -1,8 +1,10 @@
 """Tab management commands: list, create, close, switch"""
 from typing import Dict, Any, Optional
 from .base import Command
+from .registry import register
 
 
+@register
 class ListTabsCommand(Command):
     """List all open browser tabs"""
 
@@ -41,6 +43,7 @@ class ListTabsCommand(Command):
             raise RuntimeError(f"Failed to list tabs: {str(e)}")
 
 
+@register
 class CreateTabCommand(Command):
     """Create a new browser tab"""
 
@@ -71,6 +74,7 @@ class CreateTabCommand(Command):
             raise RuntimeError(f"Failed to create tab: {str(e)}")
 
 
+@register
 class CloseTabCommand(Command):
     """Close a browser tab"""
 
@@ -124,6 +128,7 @@ class CloseTabCommand(Command):
             raise RuntimeError(f"Failed to close tab: {str(e)}")
 
 
+@register
 class SwitchTabCommand(Command):
     """Switch to a different tab"""
 

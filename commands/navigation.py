@@ -2,8 +2,10 @@
 import asyncio
 from typing import Dict, Any
 from .base import Command
+from .registry import register
 
 
+@register
 class OpenUrlCommand(Command):
     """Navigate to a URL"""
 
@@ -36,6 +38,7 @@ class OpenUrlCommand(Command):
             raise RuntimeError(f"Failed to open URL: {str(e)}")
 
 
+@register
 class GetTextCommand(Command):
     """Extract text from elements"""
 

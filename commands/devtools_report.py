@@ -1,8 +1,10 @@
 """Generate comprehensive DevTools report"""
 from typing import Dict, Any
 from .base import Command
+from .registry import register
 
 
+@register
 class DevToolsReportCommand(Command):
     """Generate comprehensive DevTools debugging report"""
 

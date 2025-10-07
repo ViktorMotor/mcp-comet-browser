@@ -1,8 +1,10 @@
 """Lightweight text-based page snapshot (replaces heavy screenshots)"""
 from typing import Dict, Any
 from .base import Command
+from .registry import register
 
 
+@register
 class PageSnapshotCommand(Command):
     """Get lightweight text-based page snapshot instead of heavy screenshot"""
 

@@ -2,11 +2,13 @@
 import asyncio
 from typing import Dict, Any, Optional
 from .base import Command
+from .registry import register
 from mcp.logging_config import get_logger
 
 logger = get_logger("commands.interaction")
 
 
+@register
 class ClickCommand(Command):
     """Click on an element with multiple search strategies"""
 
@@ -216,6 +218,7 @@ class ClickCommand(Command):
             return error_result
 
 
+@register
 class ClickByTextCommand(Command):
     """Click element by visible text content"""
 
@@ -516,6 +519,7 @@ Tip: Use save_page_info() first to see available elements and verify click worke
             return error_result
 
 
+@register
 class ScrollPageCommand(Command):
     """Scroll page or element"""
 
@@ -632,6 +636,7 @@ class ScrollPageCommand(Command):
             raise RuntimeError(f"Failed to scroll page: {str(e)}")
 
 
+@register
 class MoveCursorCommand(Command):
     """Move AI cursor to position"""
 

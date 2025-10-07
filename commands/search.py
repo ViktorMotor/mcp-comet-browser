@@ -1,8 +1,10 @@
 """Search and query commands for finding elements"""
 from typing import Dict, Any, Optional
 from .base import Command
+from .registry import register
 
 
+@register
 class FindElementsCommand(Command):
     """Find all elements matching criteria (text, tag, attributes)"""
 
@@ -104,6 +106,7 @@ After calling this, use Read('./page_info.json') to see all interactive elements
             }
 
 
+@register
 class GetPageStructureCommand(Command):
     """Get page structure overview (headings, links, buttons, forms)"""
 
