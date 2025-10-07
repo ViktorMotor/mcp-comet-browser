@@ -4,6 +4,7 @@ import os
 from typing import Dict, Any
 from .base import Command
 from .registry import register
+from utils.json_optimizer import JsonOptimizer
 
 
 @register
@@ -19,12 +20,21 @@ Contains: buttons/links positions, DevTools console (last 10 logs), network requ
     input_schema = {
         "type": "object",
         "properties": {
-            "output_file": {"type": "string", "description": "Output file path", "default": "./page_info.json"}
+            "output_file": {
+                "type": "string",
+                "description": "Output file path",
+                "default": "./page_info.json"
+            },
+            "full": {
+                "type": "boolean",
+                "description": "If true, return full unoptimized data (for debugging)",
+                "default": False
+            }
         }
     }
 
-    async def execute(self, output_file: str = "./page_info.json") -> Dict[str, Any]:
-        """Save page info to file"""
+    async def execute(self, output_file: str = "./page_info.json", full: bool = False) -> Dict[str, Any]:
+        """Save page info to file (optimized by default, use full=True for debugging)"""
         try:
             js_code = """
             (function() {
@@ -94,16 +104,25 @@ Contains: buttons/links positions, DevTools console (last 10 logs), network requ
             result = self.tab.Runtime.evaluate(expression=js_code, returnByValue=True)
             page_info = result.get('result', {}).get('value', {})
 
+            # Optimize data (unless full=True)
+            optimized_data = JsonOptimizer.optimize_page_info(page_info, full=full)
+
             # Save to file
             os.makedirs(os.path.dirname(output_file) or '.', exist_ok=True)
             with open(output_file, 'w', encoding='utf-8') as f:
-                json.dump(page_info, f, indent=2, ensure_ascii=False)
+                json.dump(optimized_data, f, indent=2, ensure_ascii=False)
+
+            # Calculate size info
+            file_size = os.path.getsize(output_file)
+            size_kb = round(file_size / 1024, 1)
 
             return {
                 "success": True,
-                "message": f"Page info saved to {output_file}",
+                "message": f"Page info saved to {output_file} ({size_kb}KB, {'full' if full else 'optimized'} mode)",
                 "file": output_file,
-                "summary": page_info.get('summary', {})
+                "size_kb": size_kb,
+                "optimized": not full,
+                "summary": optimized_data.get('summary', {})
             }
 
         except Exception as e:
