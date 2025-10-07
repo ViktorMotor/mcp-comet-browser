@@ -9,13 +9,23 @@ MCP (Model Context Protocol) сервер для управления брауз
 - **pychrome** — библиотека для взаимодействия с Chrome DevTools Protocol (CDP)
 - **Comet Browser** — запущен с флагом `--remote-debugging-port=9222`
 
-Сервер предоставляет 18 методов:
+Сервер предоставляет 29 инструментов:
 
-**Базовые:** `open_url`, `get_text`, `click`, `click_by_text`, `screenshot`, `evaluate_js`, `scroll_page`, `move_cursor`
+**Навигация (2):** `open_url`, `get_text`
 
-**DevTools:** `open_devtools`, `close_devtools`, `console_command`, `get_console_logs`, `inspect_element`, `get_network_activity`
+**Взаимодействие (4):** `click`, `click_by_text`, `scroll_page`, `move_cursor`
 
-**Вкладки:** `list_tabs`, `create_tab`, `close_tab`, `switch_tab`
+**DevTools (6):** `open_devtools`, `close_devtools`, `console_command`, `get_console_logs`, `inspect_element`, `get_network_activity`
+
+**Вкладки (4):** `list_tabs`, `create_tab`, `close_tab`, `switch_tab`
+
+**Выполнение кода и скриншоты (4):** `evaluate_js`, `screenshot`, `get_page_snapshot`, `save_page_info`
+
+**Поиск и структура страницы (2):** `find_elements`, `get_page_structure`
+
+**Отладка (3):** `debug_element`, `force_click`, `open_devtools_ui`
+
+**Диагностика (4):** `enable_console_logging`, `diagnose_page`, `get_clickable_elements`, `devtools_report`
 
 ## Визуализация курсора AI
 
@@ -68,7 +78,11 @@ chromium --remote-debugging-port=9222
 
 ### 2.1. Настройка для WSL (Windows Subsystem for Linux)
 
-Если вы используете WSL и Claude Code запущен в Linux-окружении, необходимо настроить проброс портов и брандмауэр:
+Если вы используете WSL и Claude Code запущен в Linux-окружении, необходимо настроить проброс портов и брандмауэр.
+
+#### ✅ Решение (ПРОВЕРЕНО И РАБОТАЕТ)
+
+**Проблема:** Служба **IP Helper** (iphlpsvc) в Windows может быть остановлена, из-за чего правило `netsh portproxy` не работает.
 
 **Шаг 1: Запустите браузер на Windows**
 
@@ -76,13 +90,21 @@ chromium --remote-debugging-port=9222
 "C:\Users\<USERNAME>\AppData\Local\Perplexity\Comet\Application\Comet.exe" --remote-debugging-port=9222
 ```
 
-**Важно:** Chromium/Comet по умолчанию слушает только на `127.0.0.1` (localhost), поэтому нужен проброс портов для доступа из WSL.
+**Шаг 2: Включите службу IP Helper (ВАЖНО!)**
 
-**Шаг 2: Настройте проброс портов**
-
-В Windows PowerShell от администратора выполните:
+В Windows PowerShell от администратора:
 ```powershell
-# Добавить проброс портов (localhost Windows → WSL)
+# Запустить службу
+net start iphlpsvc
+
+# Настроить автозапуск
+Set-Service -Name iphlpsvc -StartupType Automatic
+```
+
+**Шаг 3: Настройте проброс портов**
+
+```powershell
+# Добавить проброс портов
 netsh interface portproxy add v4tov4 listenport=9222 listenaddress=0.0.0.0 connectport=9222 connectaddress=127.0.0.1
 
 # Проверить настройку
@@ -97,30 +119,14 @@ Address         Port        Address         Port
 0.0.0.0         9222        127.0.0.1       9222
 ```
 
-**Шаг 3: Настройте брандмауэр Windows**
+**Шаг 4: Настройте брандмауэр Windows**
 
 ```powershell
-# Удалить старые правила (если есть)
-Get-NetFirewallRule | Where-Object {$_.DisplayName -like "*9222*" -or $_.DisplayName -like "*Chrome Debug*"} | Remove-NetFirewallRule
-
-# Создать правило для WSL
-New-NetFirewallRule `
-    -DisplayName "Comet CDP WSL Access" `
-    -Description "Allow WSL to access Comet Chrome DevTools Protocol on port 9222" `
-    -Direction Inbound `
-    -LocalPort 9222 `
-    -Protocol TCP `
-    -Action Allow `
-    -Profile Private,Domain,Public `
-    -Enabled True
-
-# Проверить правило
-Get-NetFirewallRule -DisplayName "Comet CDP WSL Access" | Format-List DisplayName, Enabled, Action
+New-NetFirewallRule -DisplayName "WSL2 Chrome DevTools" -Direction Inbound -LocalPort 9222 -Protocol TCP -Action Allow
 ```
 
-**Шаг 4: Проверка из WSL**
+**Шаг 5: Проверка из WSL**
 
-В WSL терминале выполните:
 ```bash
 # Получить IP Windows хоста
 WINDOWS_HOST=$(cat /etc/resolv.conf | grep nameserver | awk '{print $2}')
@@ -130,34 +136,39 @@ echo "Windows host IP: $WINDOWS_HOST"
 curl http://$WINDOWS_HOST:9222/json/version
 ```
 
-Должен вернуться JSON с информацией о браузере:
-```json
-{
-  "Browser": "Chrome/140.x.x.x",
-  "Protocol-Version": "1.3",
-  ...
-}
+Должен вернуться JSON с информацией о браузере.
+
+#### Автоматическая настройка
+
+Используйте скрипт `fix_portproxy.ps1` (в PowerShell от администратора):
+```powershell
+.\fix_portproxy.ps1
 ```
 
-**Если не работает:**
+#### Troubleshooting WSL
 
-1. Временно отключите брандмауэр для теста:
-   ```powershell
-   Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled False
-   ```
+**Если не работает после перезагрузки:**
 
-2. Если curl заработал - значит проблема в правиле брандмауэра. Включите обратно и пересоздайте правило:
-   ```powershell
-   Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled True
-   ```
+1. Проверьте службу IP Helper:
+```powershell
+Get-Service iphlpsvc
+# Если Stopped:
+net start iphlpsvc
+```
 
-3. Проверьте, что браузер слушает на порту:
-   ```powershell
-   netstat -ano | findstr :9222
-   ```
-   Должно быть: `TCP    127.0.0.1:9222  ...  LISTENING`
+2. Проверьте правило portproxy:
+```powershell
+netsh interface portproxy show all
+# Если пусто - пересоздайте правило
+```
 
-**Примечание:** `server.py` автоматически определяет IP Windows хоста из `/etc/resolv.conf` и подключается к нему.
+**Альтернативное решение:** Если IP Helper не работает, используйте Python прокси `chrome_proxy.py`:
+```bash
+python3 chrome_proxy.py
+# Затем подключайтесь к localhost:9223 вместо IP Windows хоста
+```
+
+Подробнее: см. файлы `SOLUTION.md` и `fix_comet_wsl.md` в репозитории.
 
 ### 3. Проверьте окружение
 
@@ -445,7 +456,7 @@ python server.py
 **DevTools команды не работают?**
 - Обновите сервер: `git pull`
 - Перезапустите Claude Code
-- Проверьте: должно быть 11 команд (включая 6 DevTools)
+- Проверьте: должно быть 29 инструментов (включая 6 DevTools, 4 диагностики, 3 отладки)
 
 **Обновление MCP сервера:**
 ```bash
