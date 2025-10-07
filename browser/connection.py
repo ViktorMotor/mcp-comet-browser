@@ -5,6 +5,7 @@ from typing import Optional
 import pychrome
 from .cursor import AICursor
 from mcp.logging_config import get_logger
+from mcp.errors import ConnectionError as MCPConnectionError, TabStoppedError, BrowserError
 
 logger = get_logger("browser.connection")
 
@@ -38,8 +39,9 @@ class BrowserConnection:
                             if line.startswith('nameserver'):
                                 debug_host = line.split()[1]
                                 break
-                except:
-                    pass
+                except (FileNotFoundError, PermissionError, IOError):
+                    # Not in WSL or can't read resolv.conf - fallback to localhost
+                    logger.debug("Could not read /etc/resolv.conf, using localhost")
 
             self.debug_host = debug_host or "127.0.0.1"
         self.browser: Optional[pychrome.Browser] = None
@@ -61,15 +63,18 @@ class BrowserConnection:
                     logger.warning(f"Tab connection lost: {str(e)}, reconnecting...")
                     try:
                         self.tab.stop()
-                    except:
-                        pass
+                    except Exception as stop_error:
+                        logger.debug(f"Failed to stop tab: {stop_error}")
                     self.tab = None
 
             # Reconnect to browser
             await self.connect()
             return True
+        except MCPConnectionError:
+            # Re-raise our typed errors
+            raise
         except Exception as e:
-            raise ConnectionError(f"Failed to ensure connection: {str(e)}")
+            raise MCPConnectionError(f"Failed to ensure connection: {str(e)}")
 
     async def connect(self):
         """Connect to the existing Comet browser instance"""
@@ -108,8 +113,17 @@ class BrowserConnection:
             await self.cursor.initialize()
 
             return True
+        except MCPConnectionError:
+            # Re-raise our typed errors
+            raise
         except Exception as e:
-            raise ConnectionError(f"Failed to connect to browser on port {self.debug_port}: {str(e)}")
+            # Use the browser_url for better error message
+            browser_url = self.debug_url or f"http://{self.debug_host}:{self.debug_port}"
+            raise MCPConnectionError(
+                f"Failed to connect to browser at {browser_url}: {str(e)}",
+                host=self.debug_host,
+                port=self.debug_port
+            )
 
     async def force_enable_console_logging(self):
         """Force re-enable console logging and clear any issues"""
@@ -287,5 +301,5 @@ class BrowserConnection:
         try:
             if self.tab:
                 self.tab.stop()
-        except:
-            pass
+        except Exception as e:
+            logger.debug(f"Error stopping tab during close: {e}")

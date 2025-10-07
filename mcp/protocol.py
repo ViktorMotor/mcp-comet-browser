@@ -5,6 +5,10 @@ import asyncio
 from typing import Dict, Any
 from browser.connection import BrowserConnection
 from mcp.logging_config import get_logger
+from mcp.errors import (
+    MCPError, ParseError, MethodNotFound, InternalError,
+    BrowserError, CommandError, ValidationError
+)
 
 logger = get_logger("protocol")
 from commands.navigation import OpenUrlCommand, GetTextCommand
@@ -127,14 +131,7 @@ class MCPJSONRPCServer:
                 tool_params = params.get('arguments', {})
                 result = await self.call_tool(tool_name, tool_params)
             else:
-                return {
-                    "jsonrpc": "2.0",
-                    "id": request_id,
-                    "error": {
-                        "code": -32601,
-                        "message": f"Method not found: {method}"
-                    }
-                }
+                raise MethodNotFound(method)
 
             return {
                 "jsonrpc": "2.0",
@@ -142,14 +139,22 @@ class MCPJSONRPCServer:
                 "result": result
             }
 
-        except Exception as e:
+        except MCPError as e:
+            # Handle typed MCP errors
+            logger.error(f"MCP error: {e.message}")
             return {
                 "jsonrpc": "2.0",
                 "id": request_id,
-                "error": {
-                    "code": -32000,
-                    "message": str(e)
-                }
+                "error": e.to_jsonrpc_error()
+            }
+        except Exception as e:
+            # Handle unexpected errors
+            logger.error(f"Unexpected error: {str(e)}")
+            error = InternalError(str(e))
+            return {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "error": error.to_jsonrpc_error()
             }
 
     def list_tools(self) -> Dict[str, Any]:
@@ -165,7 +170,10 @@ class MCPJSONRPCServer:
     async def call_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Call a tool by name with arguments"""
         if tool_name not in self.commands:
-            raise ValueError(f"Unknown tool: {tool_name}")
+            raise ValidationError(
+                f"Unknown tool: {tool_name}",
+                data={"tool_name": tool_name, "available_tools": list(self.commands.keys())}
+            )
 
         # Ensure connection is valid
         await self.connection.ensure_connected()
@@ -254,5 +262,5 @@ class MCPJSONRPCServer:
         try:
             if self.connection.tab:
                 self.connection.tab.stop()
-        except:
-            pass
+        except Exception as e:
+            logger.debug(f"Error closing connection: {e}")
