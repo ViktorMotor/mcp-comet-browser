@@ -3,6 +3,7 @@
 import socket
 import threading
 import re
+from datetime import datetime
 
 # Listen on all interfaces (WSL can connect)
 LISTEN_HOST = '0.0.0.0'
@@ -12,11 +13,16 @@ LISTEN_PORT = 9224
 TARGET_HOST = '127.0.0.1'
 TARGET_PORT = 9222
 
+def log(message):
+    """Print message with timestamp"""
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[{timestamp}] {message}")
+
 def handle_client(client_socket, addr):
     """Handle client connection"""
     target_socket = None
     try:
-        print(f"[+] Connection from {addr[0]}:{addr[1]}")
+        log(f"[+] Connection from {addr[0]}:{addr[1]}")
 
         # Connect to browser
         target_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -61,7 +67,7 @@ def handle_client(client_socket, addr):
         t2.join()
 
     except Exception as e:
-        print(f"[!] Error: {e}")
+        log(f"[!] Error: {e}")
     finally:
         if target_socket:
             target_socket.close()
@@ -75,10 +81,10 @@ def main():
     try:
         server.bind((LISTEN_HOST, LISTEN_PORT))
         server.listen(5)
-        print(f"[*] CDP Proxy listening on {LISTEN_HOST}:{LISTEN_PORT}")
-        print(f"[*] Forwarding to {TARGET_HOST}:{TARGET_PORT}")
-        print(f"[*] WebSocket URLs rewritten for WSL compatibility")
-        print(f"[*] Press Ctrl+C to stop\n")
+        log(f"[*] CDP Proxy listening on {LISTEN_HOST}:{LISTEN_PORT}")
+        log(f"[*] Forwarding to {TARGET_HOST}:{TARGET_PORT}")
+        log(f"[*] WebSocket URLs rewritten for WSL compatibility")
+        log(f"[*] Press Ctrl+C to stop\n")
 
         while True:
             try:
@@ -87,15 +93,15 @@ def main():
             except KeyboardInterrupt:
                 raise
             except Exception as e:
-                print(f"[!] Accept error: {e}")
+                log(f"[!] Accept error: {e}")
 
     except KeyboardInterrupt:
-        print("\n[*] Shutting down gracefully...")
+        log("\n[*] Shutting down gracefully...")
     except Exception as e:
-        print(f"[!] Server error: {e}")
+        log(f"[!] Server error: {e}")
     finally:
         server.close()
-        print("[*] Proxy stopped")
+        log("[*] Proxy stopped")
 
 if __name__ == '__main__':
     main()
