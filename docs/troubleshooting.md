@@ -17,7 +17,7 @@
 
 3. **Проверьте доступность новых команд:**
    - Спросите Claude: "Какие команды доступны в comet-browser?"
-   - Должно быть 11 команд, включая DevTools
+   - Должно быть 29 команд, включая DevTools и диагностику
 
 ### Альтернативный способ (если не помогло)
 
@@ -76,154 +76,48 @@
 Запустите в терминале:
 
 ```bash
-# Проверка доступности CDP
+# Проверка доступности CDP (для локального использования)
 curl http://localhost:9222/json/version
 
-# Для WSL (определяем IP Windows хоста)
-WINDOWS_HOST=$(cat /etc/resolv.conf | grep nameserver | awk '{print $2}')
-curl http://$WINDOWS_HOST:9222/json/version
+# Для WSL - см. раздел "WSL Setup" ниже
 ```
 
 Если возвращается JSON с информацией о браузере - CDP работает.
 
 ---
 
-## Ошибка: "Failed to connect to browser on port 9222"
+## Ошибка: "Failed to connect to browser" (WSL)
 
-### Причины
-- Браузер не запущен с флагом `--remote-debugging-port=9222`
-- Порт 9222 занят другим процессом
-- Брандмауэр блокирует соединение (WSL)
+### Для пользователей WSL
 
-### Решение
+**Настройка WSL подключения полностью документирована в `.claude/CLAUDE.md`**
+
+Кратко:
+1. Запустите `windows_proxy.py` на Windows (порт 9224)
+2. MCP-сервер автоматически определит IP Windows-хоста
+3. Monkey-patches в `browser/connection.py` обработают WebSocket URLs
+
+**Полная инструкция:** См. `.claude/CLAUDE.md` → "WSL2 Setup"
+
+### Для локального использования (не WSL)
 
 **1. Проверьте, запущен ли браузер с CDP:**
 
-Windows:
-```cmd
-netstat -ano | findstr :9222
-```
-
-Linux/WSL:
 ```bash
 lsof -i :9222
-```
-
-**2. Запустите браузер правильно:**
-
-Windows (Comet/Perplexity):
-```cmd
-"C:\Users\<USERNAME>\AppData\Local\Perplexity\Comet\Application\Comet.exe" --remote-debugging-port=9222
-```
-
-**3. Для WSL - настройте проброс портов:**
-
-В Windows PowerShell (от администратора):
-```powershell
-# Правило брандмауэра
-New-NetFirewallRule -DisplayName "Chrome Debug Port" -Direction Inbound -LocalPort 9222 -Protocol TCP -Action Allow
-
-# Проброс портов
-netsh interface portproxy add v4tov4 listenport=9222 listenaddress=0.0.0.0 connectport=9222 connectaddress=127.0.0.1
-
-# Проверка
-netsh interface portproxy show all
-```
-
-**4. Проверьте из WSL:**
-```bash
-curl http://$(cat /etc/resolv.conf | grep nameserver | awk '{print $2}'):9222/json/version
-```
-
----
-
-## Ошибка: "Connection reset by peer" (WSL)
-
-### Симптомы
-- `curl` возвращает ошибку или зависает
-- MCP сервер не может подключиться к браузеру на Windows
-- `netstat` показывает, что браузер слушает только на `127.0.0.1:9222`
-
-### Причина
-**Брандмауэр Windows блокирует соединения с WSL**, даже если проброс портов настроен.
-
-### Диагностика
-
-**1. Проверьте, что браузер слушает (в Windows PowerShell):**
-```powershell
+# или на Windows
 netstat -ano | findstr :9222
 ```
 
-Должно быть:
-```
-TCP    127.0.0.1:9222         0.0.0.0:0              LISTENING       12345
-```
+**2. Запустите браузер с CDP:**
 
-**2. Проверьте проброс портов:**
-```powershell
-netsh interface portproxy show all
-```
-
-Должно быть:
-```
-0.0.0.0    9222    127.0.0.1    9222
-```
-
-**3. Тест без брандмауэра (временно!):**
-```powershell
-Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled False
-```
-
-Проверьте из WSL:
 ```bash
-curl http://$(cat /etc/resolv.conf | grep nameserver | awk '{print $2}'):9222/json/version
+# Linux/Mac
+/path/to/chrome --remote-debugging-port=9222
+
+# Windows (Comet/Perplexity)
+"C:\Users\<USERNAME>\AppData\Local\Perplexity\Comet\Application\Comet.exe" --remote-debugging-port=9222
 ```
-
-Если **заработало** - проблема точно в брандмауэре!
-
-### Решение
-
-**1. Включите брандмауэр обратно:**
-```powershell
-Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled True
-```
-
-**2. Удалите старые правила:**
-```powershell
-Get-NetFirewallRule | Where-Object {$_.DisplayName -like "*9222*" -or $_.DisplayName -like "*Chrome*" -or $_.DisplayName -like "*Comet*"} | Remove-NetFirewallRule
-```
-
-**3. Создайте правильное правило:**
-```powershell
-New-NetFirewallRule `
-    -DisplayName "Comet CDP WSL Access" `
-    -Description "Allow WSL to access Comet Chrome DevTools Protocol on port 9222" `
-    -Direction Inbound `
-    -LocalPort 9222 `
-    -Protocol TCP `
-    -Action Allow `
-    -Profile Private,Domain,Public `
-    -Enabled True
-```
-
-**4. Проверьте правило:**
-```powershell
-Get-NetFirewallRule -DisplayName "Comet CDP WSL Access" | Format-List DisplayName, Enabled, Action, LocalPort
-```
-
-**5. Проверьте из WSL:**
-```bash
-curl http://$(cat /etc/resolv.conf | grep nameserver | awk '{print $2}'):9222/json/version
-```
-
-Должен вернуться JSON! ✅
-
-### Важные замечания
-
-- Chromium/Comet **НЕ поддерживает** bind на `0.0.0.0` - всегда слушает только localhost
-- Поэтому **обязательно нужен проброс портов** через `netsh interface portproxy`
-- Брандмауэр должен разрешать входящие соединения на порт 9222 от **любых адресов** (включая WSL подсеть `172.16.0.0/12`)
-- `server.py` автоматически определяет IP Windows хоста из `/etc/resolv.conf`
 
 ---
 
@@ -311,18 +205,13 @@ git pull
 Покажи список всех доступных команд comet-browser
 ```
 
-Должно быть 11 команд:
-- open_url
-- get_text
-- click
-- screenshot
-- evaluate_js
-- **open_devtools** ⬅️ Новые
-- **close_devtools** ⬅️ Новые
-- **console_command** ⬅️ Новые
-- **get_console_logs** ⬅️ Новые
-- **inspect_element** ⬅️ Новые
-- **get_network_activity** ⬅️ Новые
+Должно быть **29 команд** (полный список в `.claude/CLAUDE.md`):
+- Навигация: open_url, get_text
+- Взаимодействие: click, click_by_text, scroll_page, move_cursor
+- DevTools: open_devtools, console_command, get_console_logs, inspect_element, get_network_activity, etc.
+- Вкладки: list_tabs, create_tab, close_tab, switch_tab
+- Диагностика: diagnose_page, debug_element, force_click, etc.
+- И другие...
 
 ---
 
@@ -417,7 +306,7 @@ python3 server.py
 {"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}}
 ```
 
-Должен вернуться список из 11 инструментов.
+Должен вернуться список из 29 инструментов.
 
 ---
 
@@ -427,7 +316,7 @@ python3 server.py
 A: Нет, только перезапустите Claude Code.
 
 **Q: Как узнать, что сервер обновился?**
-A: Спросите Claude: "Какие команды DevTools доступны?" Должно быть 6 новых команд.
+A: Спросите Claude: "Сколько команд доступно в comet-browser?" Должно быть 29 команд.
 
 **Q: Работает ли автопереподключение?**
 A: Да, начиная с версии 1.1.0. Проверьте: закройте вкладку браузера, затем попросите Claude открыть URL - должно работать.
