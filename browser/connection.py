@@ -1,5 +1,6 @@
 """Browser connection management via Chrome DevTools Protocol"""
 import sys
+import os
 import asyncio
 from typing import Optional
 import pychrome
@@ -10,15 +11,81 @@ from mcp.errors import ConnectionError as MCPConnectionError, TabStoppedError, B
 
 logger = get_logger("browser.connection")
 
+# Monkey-patch websocket library to disable proxy for CDP connections
+# This fixes WebSocketProxyException: failed CONNECT via proxy status: 502
+import websocket
+_original_create_connection = websocket.create_connection
+
+def _create_connection_no_proxy(url, **options):
+    """Wrapper that disables proxy for WebSocket connections"""
+    # Temporarily clear proxy environment variables
+    proxy_vars = ['http_proxy', 'https_proxy', 'HTTP_PROXY', 'HTTPS_PROXY',
+                  'ALL_PROXY', 'all_proxy']
+    saved_env = {}
+
+    try:
+        # Save and clear proxy variables
+        for var in proxy_vars:
+            if var in os.environ:
+                saved_env[var] = os.environ[var]
+                del os.environ[var]
+
+        # Force disable proxy in options
+        options['http_proxy_host'] = None
+        options['http_proxy_port'] = None
+        options['proxy_type'] = None
+
+        return _original_create_connection(url, **options)
+    finally:
+        # Restore proxy variables
+        for var, value in saved_env.items():
+            os.environ[var] = value
+
+websocket.create_connection = _create_connection_no_proxy
+logger.debug("WebSocket proxy disabled for CDP connections")
+
+# Monkey-patch pychrome.Browser.list_tab to rewrite WebSocket URLs
+_original_list_tab = pychrome.Browser.list_tab
+
+def _list_tab_with_url_rewrite(self):
+    """Wrapper that rewrites WebSocket URLs for WSL compatibility"""
+    tabs = _original_list_tab(self)
+
+    # Get proxy host from browser URL (e.g., http://172.23.128.1:9224)
+    if hasattr(self, 'dev_url'):
+        import re
+        match = re.search(r'http://([^:]+):(\d+)', self.dev_url)
+        if match:
+            proxy_host = match.group(1)
+            proxy_port = match.group(2)
+
+            # Rewrite WebSocket URLs in each tab
+            for tab in tabs:
+                if hasattr(tab, '_websocket_url'):
+                    # Replace ws://127.0.0.1:9222/ with ws://PROXY_HOST:PROXY_PORT/
+                    original_ws = tab._websocket_url
+                    tab._websocket_url = re.sub(
+                        r'ws://127\.0\.0\.1:9222/',
+                        f'ws://{proxy_host}:{proxy_port}/',
+                        original_ws
+                    )
+                    if tab._websocket_url != original_ws:
+                        logger.debug(f"Rewrote WebSocket URL: {original_ws} → {tab._websocket_url}")
+
+    return tabs
+
+pychrome.Browser.list_tab = _list_tab_with_url_rewrite
+logger.debug("pychrome.Browser.list_tab monkey-patched for WebSocket URL rewriting")
+
 
 class BrowserConnection:
     """Manages connection to Comet browser via CDP"""
 
-    def __init__(self, debug_port = 9222, debug_host: str = None):
+    def __init__(self, debug_port = 9224, debug_host: str = None):
         """Initialize browser connection
 
         Args:
-            debug_port: CDP debug port (int) or full URL (str like 'http://host:port')
+            debug_port: CDP debug port (default 9224 for Windows proxy)
             debug_host: Debug host IP (auto-detects WSL host if None, ignored if debug_port is URL)
         """
         # Support both port number and full URL
@@ -93,16 +160,23 @@ class BrowserConnection:
                 # Use the first available tab
                 self.tab = tabs[0]
 
-            # Start the tab to enable CDP commands
-            self.tab.start()
+            # Start the tab - WebSocket should work now (proxy rewrites URLs and proxies WebSocket)
+            try:
+                self.tab.start()
+                logger.info(f"Connected to {self.debug_host}:{self.debug_port} via WebSocket")
+            except Exception as e:
+                logger.error(f"Failed to start tab: {e}")
+                raise
 
             # Enable necessary domains
             self.tab.Page.enable()
             self.tab.DOM.enable()
             self.tab.Runtime.enable()
-            self.tab.Console.enable()  # Enable console for logs
-            self.tab.Network.enable()  # Enable network monitoring
-            self.tab.Debugger.enable()  # Enable debugger
+            self.tab.Console.enable()
+            self.tab.Network.enable()
+            self.tab.Debugger.enable()
+
+            logger.debug("CDP domains enabled")
 
             # Set up console message listeners
             self._setup_console_listeners()
