@@ -38,6 +38,18 @@ MCP (Model Context Protocol) сервер для управления брауз
 
 **Диагностика (4):** `enable_console_logging`, `diagnose_page`, `get_clickable_elements`, `devtools_report`
 
+## Стабильность соединения
+
+Версия 2.1 включает улучшения стабильности:
+
+- **WebSocket Keep-Alive** - ping/pong каждые 30 секунд предотвращает idle disconnections
+- **Background Health Check** - автоматическая проверка соединения каждые 45 секунд
+- **Автоматическое переподключение** - прозрачное восстановление при разрыве связи с exponential backoff
+- **TCP Keep-Alive в Proxy** - windows_proxy.py использует TCP keep-alive (30s idle, 10s interval)
+- **Thread-Safe CDP** - все команды используют AsyncCDP wrapper, никаких race conditions
+
+**Результат:** соединение стабильно при любой длительности бездействия, `/mcp reconnect` больше не требуется.
+
 ## Визуализация курсора AI
 
 Сервер автоматически создаёт **визуальный курсор AI** (синий светящийся кружок), который показывает, куда смотрит модель:
@@ -128,6 +140,7 @@ powershell.exe -Command "cd 'C:\Users\<USERNAME>\mcp_comet_for_claude_code'; pyt
 ```
 [*] CDP Proxy listening on 0.0.0.0:9224
 [*] Forwarding to 127.0.0.1:9222
+[*] TCP keep-alive enabled (Windows mode: 30s idle, 10s interval)
 [*] Press Ctrl+C to stop
 ```
 
@@ -482,9 +495,9 @@ python server.py
 ### Быстрые решения
 
 **Ошибка: "Tab has been stopped"**
-- Обновите сервер: `cd ~/mcp-comet-browser && git pull`
-- Перезапустите Claude Code
-- Сервер теперь автоматически переподключается к браузеру
+- Сервер автоматически переподключается (background health check loop)
+- Если проблема сохраняется: обновите сервер (`git pull`) и перезапустите Claude Code
+- Ручной реконнект `/mcp reconnect` больше не требуется
 
 **Ошибка: "Failed to connect to browser"**
 - Убедитесь, что Comet запущен с флагом `--remote-debugging-port=9222`
@@ -543,8 +556,7 @@ mcp_comet_for_claude_code/
 └── docs/
     ├── examples.json           # Примеры MCP-запросов
     ├── devtools_examples.md    # Примеры DevTools команд
-    ├── troubleshooting.md      # Устранение неполадок
-    └── roadmap-v2.md           # История рефакторинга V2
+    └── troubleshooting.md      # Устранение неполадок
 ```
 
 ### Архитектура V2 (Roadmap V2 Refactored)
@@ -557,6 +569,8 @@ mcp_comet_for_claude_code/
 - **Auto-discovery** - команды регистрируются через `@register` декоратор
 - **Async CDP wrapper** - thread-safe wrapper для pychrome
 - **JSON optimization** - оптимизация вывода save_page_info (58.8% сокращение)
+- **Connection stability** - WebSocket keep-alive + background health check с автопереподключением
+- **TCP keep-alive** - стабильные соединения на уровне ОС в windows_proxy.py
 
 ## Лицензия
 
