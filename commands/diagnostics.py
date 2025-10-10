@@ -75,7 +75,8 @@ class DiagnosePageCommand(Command):
             })()
             """
 
-            result = self.tab.Runtime.evaluate(expression=js_code, returnByValue=True)
+            # Use AsyncCDP wrapper for thread-safe evaluation (STABILITY FIX)
+            result = await self.context.cdp.evaluate(expression=js_code, returnByValue=True)
             diagnostics = result.get('result', {}).get('value', {})
 
             return {
@@ -165,7 +166,8 @@ class GetClickableElementsCommand(Command):
             }})()
             """
 
-            result = self.tab.Runtime.evaluate(expression=js_code, returnByValue=True)
+            # Use AsyncCDP wrapper for thread-safe evaluation (STABILITY FIX)
+            result = await self.context.cdp.evaluate(expression=js_code, returnByValue=True)
             return result.get('result', {}).get('value', {})
         except Exception as e:
             return {

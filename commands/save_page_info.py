@@ -101,7 +101,8 @@ Contains: buttons/links positions, DevTools console (last 10 logs), network requ
             })()
             """
 
-            result = self.tab.Runtime.evaluate(expression=js_code, returnByValue=True)
+            # Use AsyncCDP wrapper for thread-safe evaluation (STABILITY FIX)
+            result = await self.context.cdp.evaluate(expression=js_code, returnByValue=True)
             page_info = result.get('result', {}).get('value', {})
 
             # Optimize data (unless full=True)

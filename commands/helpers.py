@@ -113,7 +113,8 @@ class DebugElementCommand(Command):
             }})()
             """
 
-            result = self.tab.Runtime.evaluate(expression=js_code, returnByValue=True)
+            # Use AsyncCDP wrapper for thread-safe evaluation (STABILITY FIX)
+            result = await self.context.cdp.evaluate(expression=js_code, returnByValue=True)
             return result.get('result', {}).get('value', {})
         except Exception as e:
             return {
@@ -310,7 +311,8 @@ class ForceClickCommand(Command):
             else:
                 return {"success": False, "message": "Provide either x,y coordinates or text"}
 
-            result = self.tab.Runtime.evaluate(expression=js_code, returnByValue=True, awaitPromise=True)
+            # Use AsyncCDP wrapper for thread-safe evaluation (STABILITY FIX)
+            result = await self.context.cdp.evaluate(expression=js_code, returnByValue=True, awaitPromise=True)
             return result.get('result', {}).get('value', {})
         except Exception as e:
             return {

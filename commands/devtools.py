@@ -34,7 +34,8 @@ class OpenDevtoolsCommand(Command):
                 return {success: true, message: 'DevTools open command sent'};
             })()
             """
-            self.tab.Runtime.evaluate(expression=js_code, returnByValue=True)
+            # Use AsyncCDP wrapper for thread-safe evaluation (STABILITY FIX)
+            await self.context.cdp.evaluate(expression=js_code, returnByValue=True)
             return {
                 "success": True,
                 "message": "DevTools opened (F12). Note: UI may not show via CDP, but debugging is active.",
@@ -71,7 +72,8 @@ class CloseDevtoolsCommand(Command):
                 return {success: true, message: 'DevTools close command sent'};
             })()
             """
-            self.tab.Runtime.evaluate(expression=js_code, returnByValue=True)
+            # Use AsyncCDP wrapper for thread-safe evaluation (STABILITY FIX)
+            await self.context.cdp.evaluate(expression=js_code, returnByValue=True)
             return {"success": True, "message": "DevTools closed (F12)"}
         except Exception as e:
             raise RuntimeError(f"Failed to close DevTools: {str(e)}")
@@ -95,7 +97,8 @@ class ConsoleCommandCommand(Command):
         """Execute command in console context"""
         try:
             # First try with returnByValue=True
-            result = self.tab.Runtime.evaluate(
+            # Use AsyncCDP wrapper for thread-safe evaluation (STABILITY FIX)
+            result = await self.context.cdp.evaluate(
                 expression=command,
                 returnByValue=True,
                 awaitPromise=True
@@ -148,7 +151,8 @@ class ConsoleCommandCommand(Command):
                         return result;
                     }})()
                     """
-                    retry_result = self.tab.Runtime.evaluate(
+                    # Use AsyncCDP wrapper for thread-safe evaluation (STABILITY FIX)
+                    retry_result = await self.context.cdp.evaluate(
                         expression=wrapped_command,
                         returnByValue=True,
                         awaitPromise=True
@@ -360,7 +364,8 @@ class InspectElementCommand(Command):
             }})()
             """
 
-            js_result = self.tab.Runtime.evaluate(expression=js_find_code, returnByValue=True)
+            # Use AsyncCDP wrapper for thread-safe evaluation (STABILITY FIX)
+            js_result = await self.context.cdp.evaluate(expression=js_find_code, returnByValue=True)
             result = js_result.get('result', {}).get('value', {})
 
             if not result.get('success'):

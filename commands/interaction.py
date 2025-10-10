@@ -195,7 +195,8 @@ class ClickCommand(Command):
             }})()
             """
 
-            result = self.tab.Runtime.evaluate(expression=js_code, returnByValue=True, awaitPromise=True)
+            # Use AsyncCDP wrapper for thread-safe evaluation (STABILITY FIX)
+            result = await self.context.cdp.evaluate(expression=js_code, returnByValue=True, awaitPromise=True)
             click_result = result.get('result', {}).get('value', {})
 
             # Log result for debugging
@@ -499,7 +500,8 @@ Tip: Use save_page_info() first to see available elements and verify click worke
             }})()
             """
 
-            result = self.tab.Runtime.evaluate(expression=js_code, returnByValue=True, awaitPromise=True)
+            # Use AsyncCDP wrapper for thread-safe evaluation (STABILITY FIX)
+            result = await self.context.cdp.evaluate(expression=js_code, returnByValue=True, awaitPromise=True)
             click_result = result.get('result', {}).get('value', {})
 
             # Log result to stderr for debugging
@@ -618,7 +620,8 @@ class ScrollPageCommand(Command):
                 }})()
                 """
 
-            result = self.tab.Runtime.evaluate(expression=js_code, returnByValue=True)
+            # Use AsyncCDP wrapper for thread-safe evaluation (STABILITY FIX)
+            result = await self.context.cdp.evaluate(expression=js_code, returnByValue=True)
             scroll_info = result.get('result', {}).get('value', {})
 
             if selector and not scroll_info.get('success', True):
@@ -711,7 +714,8 @@ class MoveCursorCommand(Command):
             else:
                 return {"success": False, "message": "Either provide x,y coordinates or selector"}
 
-            result = self.tab.Runtime.evaluate(expression=js_code, returnByValue=True)
+            # Use AsyncCDP wrapper for thread-safe evaluation (STABILITY FIX)
+            result = await self.context.cdp.evaluate(expression=js_code, returnByValue=True)
             return result.get('result', {}).get('value', {})
         except Exception as e:
             return {"success": False, "message": f"Failed to move cursor: {str(e)}", "error": str(e)}

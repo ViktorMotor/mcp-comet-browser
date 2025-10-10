@@ -26,6 +26,27 @@ def handle_client(client_socket, addr):
 
         # Connect to browser
         target_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+        # STABILITY FIX: Enable TCP keep-alive to prevent idle disconnections
+        target_socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+
+        # Platform-specific keep-alive settings
+        try:
+            # Windows: Use SIO_KEEPALIVE_VALS ioctl
+            # Parameters: (onoff, keepalivetime_ms, keepaliveinterval_ms)
+            # keepalivetime: 30 seconds, keepaliveinterval: 10 seconds
+            target_socket.ioctl(socket.SIO_KEEPALIVE_VALS, (1, 30000, 10000))
+            log("[*] TCP keep-alive enabled (Windows mode: 30s idle, 10s interval)")
+        except AttributeError:
+            # Linux/Unix: Use TCP socket options
+            try:
+                target_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 30)
+                target_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 10)
+                target_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 3)
+                log("[*] TCP keep-alive enabled (Linux mode: 30s idle, 10s interval, 3 probes)")
+            except (AttributeError, OSError) as e:
+                log(f"[!] Warning: Could not set platform-specific keep-alive parameters: {e}")
+
         target_socket.settimeout(5)
         target_socket.connect((TARGET_HOST, TARGET_PORT))
         target_socket.settimeout(None)

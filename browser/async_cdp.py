@@ -31,12 +31,14 @@ class AsyncCDP:
         self._lock = Lock()
 
     async def evaluate(self, expression: str, returnByValue: bool = False,
+                      awaitPromise: bool = False,
                       timeout: Optional[float] = None) -> Dict[str, Any]:
         """Execute JavaScript in the browser
 
         Args:
             expression: JavaScript code to execute
             returnByValue: Whether to return the value directly
+            awaitPromise: Whether to await promise resolution
             timeout: Override default timeout
 
         Returns:
@@ -50,6 +52,7 @@ class AsyncCDP:
             "Runtime.evaluate",
             expression=expression,
             returnByValue=returnByValue,
+            awaitPromise=awaitPromise,
             timeout=timeout
         )
 

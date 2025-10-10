@@ -17,7 +17,7 @@ import websocket
 _original_create_connection = websocket.create_connection
 
 def _create_connection_no_proxy(url, **options):
-    """Wrapper that disables proxy for WebSocket connections"""
+    """Wrapper that disables proxy for WebSocket connections and enables keep-alive"""
     # Temporarily clear proxy environment variables
     proxy_vars = ['http_proxy', 'https_proxy', 'HTTP_PROXY', 'HTTPS_PROXY',
                   'ALL_PROXY', 'all_proxy']
@@ -34,6 +34,12 @@ def _create_connection_no_proxy(url, **options):
         options['http_proxy_host'] = None
         options['http_proxy_port'] = None
         options['proxy_type'] = None
+
+        # STABILITY FIX: Enable WebSocket keep-alive (ping/pong)
+        # Prevents idle timeout disconnections
+        options['ping_interval'] = 30      # Send ping every 30 seconds
+        options['ping_timeout'] = 10       # Wait for pong 10 seconds
+        options['enable_multithread'] = True
 
         return _original_create_connection(url, **options)
     finally:
@@ -118,14 +124,19 @@ class BrowserConnection:
         self.console_logs = []  # Store console logs from CDP events
         self.cursor: Optional[AICursor] = None
 
+        # STABILITY FIX: Background health check
+        self._health_check_running = False
+        self._health_check_task: Optional[asyncio.Task] = None
+        self._consecutive_failures = 0
+
     async def ensure_connected(self):
         """Ensure we have a valid connection to a browser tab"""
         try:
             # Test if current tab is still alive
-            if self.tab:
+            if self.cdp:
                 try:
-                    # Try a simple command to check if tab is responsive
-                    self.tab.Runtime.evaluate(expression="1+1")
+                    # Try a simple command to check if tab is responsive (use AsyncCDP for thread-safety)
+                    await self.cdp.evaluate(expression="1+1", timeout=5)
                     return True
                 except Exception as e:
                     # Tab is dead, need to reconnect
@@ -191,6 +202,21 @@ class BrowserConnection:
             # Initialize AI cursor
             self.cursor = AICursor(self.tab)
             await self.cursor.initialize()
+
+            # STABILITY FIX: Start background health check loop
+            # Stop existing task if any (reconnection scenario)
+            if self._health_check_task:
+                self._health_check_running = False
+                self._health_check_task.cancel()
+                try:
+                    await self._health_check_task
+                except asyncio.CancelledError:
+                    pass
+
+            # Start new health check task
+            self._health_check_running = True
+            self._health_check_task = asyncio.create_task(self._health_check_loop())
+            logger.debug("Background health check started")
 
             return True
         except MCPConnectionError:
@@ -376,10 +402,71 @@ class BrowserConnection:
             logger.error(f"Failed to initialize JS console interceptor: {e}")
             return {"success": False, "error": str(e)}
 
+    async def _health_check_loop(self):
+        """Background task that monitors connection health and auto-reconnects"""
+        logger.info("Health check loop started (interval: 45s)")
+
+        while self._health_check_running:
+            try:
+                # Wait before next check
+                await asyncio.sleep(45)
+
+                # Check if connection is alive with simple evaluation
+                if self.cdp:
+                    try:
+                        # Use AsyncCDP wrapper for thread-safe evaluation
+                        await self.cdp.evaluate(expression="1+1", timeout=5)
+                        # Success - reset failure counter
+                        if self._consecutive_failures > 0:
+                            logger.info("Connection recovered after health check")
+                            self._consecutive_failures = 0
+                    except Exception as e:
+                        # Health check failed
+                        self._consecutive_failures += 1
+                        logger.warning(
+                            f"Health check failed ({self._consecutive_failures} consecutive): {e}"
+                        )
+
+                        # Calculate exponential backoff (max 60 seconds)
+                        backoff = min(60, 2 ** self._consecutive_failures)
+                        logger.info(f"Waiting {backoff}s before reconnection attempt...")
+                        await asyncio.sleep(backoff)
+
+                        # Attempt reconnection
+                        try:
+                            logger.info("Attempting automatic reconnection...")
+                            await self.connect()
+                            logger.info("✓ Automatic reconnection successful")
+                            self._consecutive_failures = 0
+                        except Exception as reconnect_error:
+                            logger.error(f"✗ Automatic reconnection failed: {reconnect_error}")
+
+            except asyncio.CancelledError:
+                # Task was cancelled (normal shutdown)
+                logger.debug("Health check loop cancelled")
+                break
+            except Exception as e:
+                logger.error(f"Unexpected error in health check loop: {e}")
+                # Continue running even if there's an error
+                await asyncio.sleep(10)
+
+        logger.info("Health check loop stopped")
+
     async def close(self):
         """Close connection to browser"""
         try:
-            # Shutdown AsyncCDP executor first
+            # Stop health check loop first
+            if self._health_check_task:
+                self._health_check_running = False
+                self._health_check_task.cancel()
+                try:
+                    await self._health_check_task
+                except asyncio.CancelledError:
+                    pass
+                self._health_check_task = None
+                logger.debug("Health check loop stopped")
+
+            # Shutdown AsyncCDP executor
             if self.cdp:
                 await self.cdp.close()
 

@@ -93,7 +93,8 @@ After calling this, use Read('./page_info.json') to see full report."""
             })()
             """
 
-            result = self.tab.Runtime.evaluate(expression=js_code, returnByValue=True)
+            # Use AsyncCDP wrapper for thread-safe evaluation (STABILITY FIX)
+            result = await self.context.cdp.evaluate(expression=js_code, returnByValue=True)
             page_data = result.get('result', {}).get('value', {})
 
             # Save to file
