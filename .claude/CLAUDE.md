@@ -321,12 +321,55 @@ if (placeholder.includes(searchNorm)) score = 40
 
 ### **Проблема**
 Comet Browser слушает только `127.0.0.1:9222`, но WSL2 находится в другой сети.
+Внешний proxy (из environment variables) блокирует WebSocket подключения.
 
-### **✅ Рабочее решение (IP Helper + portproxy)**
-**Файл:** `SOLUTION.md`
+### **✅ Рабочее решение (Python Proxy + Client-side URL Rewriting)**
+**Актуальная реализация:** `windows_proxy.py` + monkey-patches в `browser/connection.py`
 
+**На Windows:**
 ```powershell
-# 1. Включить службу IP Helper (КРИТИЧНО!)
+# Запустить прокси (простой TCP forwarding)
+cd C:\Users\work2\mcp_comet_for_claude_code
+python windows_proxy.py
+
+# Ожидаемый вывод:
+# [*] CDP Proxy listening on 0.0.0.0:9224
+# [*] Forwarding to 127.0.0.1:9222
+# [*] Press Ctrl+C to stop
+```
+
+**Как это работает:**
+1. **windows_proxy.py** (порт 9224):
+   - Простой bidirectional TCP proxy
+   - Исправляет `Host` header в HTTP запросах для CORS
+   - НЕ модифицирует WebSocket URLs (избегает проблем с Content-Length)
+   - Поддерживает Ctrl+C для корректного завершения
+
+2. **browser/connection.py** (monkey-patches):
+   - `websocket.create_connection` - временно очищает proxy environment variables
+   - `pychrome.Browser.list_tab` - переписывает WebSocket URLs на стороне клиента
+   - `ws://127.0.0.1:9222/` → `ws://WINDOWS_HOST_IP:9224/`
+
+3. **server.py**:
+   - Очищает все proxy environment variables при запуске
+   - Предотвращает попытки подключения через внешний proxy
+
+**Из WSL:**
+```bash
+# Проверить что прокси работает
+WINDOWS_HOST=$(cat /etc/resolv.conf | grep nameserver | awk '{print $2}')
+curl http://$WINDOWS_HOST:9224/json/version
+
+# MCP сервер автоматически использует порт 9224
+python3 server.py
+```
+
+### **Альтернатива: IP Helper + portproxy**
+**Файл:** `SOLUTION.md` (для справки)
+
+Если Python прокси не подходит:
+```powershell
+# 1. Включить службу IP Helper
 net start iphlpsvc
 Set-Service -Name iphlpsvc -StartupType Automatic
 
@@ -336,21 +379,8 @@ netsh interface portproxy add v4tov4 listenport=9222 listenaddress=0.0.0.0 conne
 # 3. Настроить firewall
 New-NetFirewallRule -DisplayName "WSL2 Chrome DevTools" -Direction Inbound -LocalPort 9222 -Protocol TCP -Action Allow
 
-# 4. Проверить из WSL
-WINDOWS_HOST=$(cat /etc/resolv.conf | grep nameserver | awk '{print $2}')
-curl http://$WINDOWS_HOST:9222/json/version
+# 4. В browser/connection.py изменить debug_port обратно на 9222
 ```
-
-### **Альтернатива: Python прокси**
-**Файл:** `chrome_proxy.py`
-
-Если IP Helper не работает:
-```bash
-python3 chrome_proxy.py  # Слушает на 0.0.0.0:9223
-# Затем подключаться к localhost:9223 вместо IP хоста
-```
-
-Модифицирует HTTP-заголовок `Host: 172.x.x.x:9223` → `Host: 127.0.0.1:9222`
 
 ---
 
