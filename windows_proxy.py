@@ -78,25 +78,32 @@ def main():
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
+    # Set timeout to allow Ctrl+C to work properly
+    server.settimeout(1.0)
+
     try:
         server.bind((LISTEN_HOST, LISTEN_PORT))
         server.listen(5)
         log(f"[*] CDP Proxy listening on {LISTEN_HOST}:{LISTEN_PORT}")
         log(f"[*] Forwarding to {TARGET_HOST}:{TARGET_PORT}")
         log(f"[*] WebSocket URLs rewritten for WSL compatibility")
-        log(f"[*] Press Ctrl+C to stop\n")
+        log(f"[*] Press Ctrl+C to stop")
+        print()  # Empty line for readability
 
         while True:
             try:
                 client_socket, addr = server.accept()
                 threading.Thread(target=handle_client, args=(client_socket, addr), daemon=True).start()
-            except KeyboardInterrupt:
-                raise
-            except Exception as e:
-                log(f"[!] Accept error: {e}")
+            except socket.timeout:
+                # Timeout is expected, just continue to check for Ctrl+C
+                continue
+            except OSError:
+                # Socket closed, exit gracefully
+                break
 
     except KeyboardInterrupt:
-        log("\n[*] Shutting down gracefully...")
+        print()  # New line after ^C
+        log("[*] Shutting down gracefully...")
     except Exception as e:
         log(f"[!] Server error: {e}")
     finally:
