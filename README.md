@@ -2,12 +2,23 @@
 
 MCP (Model Context Protocol) сервер для управления браузером Comet через Chrome DevTools Protocol.
 
+> **📖 Полная документация:** См. [.claude/CLAUDE.md](.claude/CLAUDE.md) для детального описания архитектуры, команд и настройки WSL.
+
 ## Архитектура
 
-Система состоит из трех компонентов:
-- **server.py** — асинхронный JSON-RPC 2.0 сервер, работающий через stdin/stdout
-- **pychrome** — библиотека для взаимодействия с Chrome DevTools Protocol (CDP)
-- **Comet Browser** — запущен с флагом `--remote-debugging-port=9222`
+Система использует **модульную архитектуру V2** с автоматической регистрацией команд:
+
+**Основные компоненты:**
+- **server.py** — точка входа, асинхронный JSON-RPC 2.0 сервер (stdin/stdout)
+- **browser/connection.py** — управление CDP подключением с monkey-patches для WSL
+- **commands/** — 29 автоматически регистрируемых команд через `@register` декоратор
+- **mcp/protocol.py** — JSON-RPC обработчик с dependency injection
+- **pychrome** — библиотека для взаимодействия с Chrome DevTools Protocol
+- **Comet Browser** — запущен с `--remote-debugging-port=9222` (или через `windows_proxy.py` для WSL)
+
+**Для WSL:**
+- **windows_proxy.py** — Python прокси на Windows (порт 9224 → 9222)
+- **Monkey-patches** — автоматическая перезапись WebSocket URLs на стороне клиента
 
 Сервер предоставляет 29 инструментов:
 
@@ -78,102 +89,125 @@ chromium --remote-debugging-port=9222
 
 ### 2.1. Настройка для WSL (Windows Subsystem for Linux)
 
-Если вы используете WSL и Claude Code запущен в Linux-окружении, необходимо настроить проброс портов и брандмауэр.
+Если вы используете WSL и Claude Code запущен в Linux-окружении, необходимо настроить прокси для WebSocket подключений.
 
-#### ✅ Решение (ПРОВЕРЕНО И РАБОТАЕТ)
+#### ✅ Рабочее решение (Python Proxy)
 
-**Проблема:** Служба **IP Helper** (iphlpsvc) в Windows может быть остановлена, из-за чего правило `netsh portproxy` не работает.
+**Проблема:**
+- Comet слушает только `127.0.0.1:9222` на Windows
+- WSL находится в отдельной сети
+- Внешние proxy из environment variables блокируют WebSocket
 
-**Шаг 1: Запустите браузер на Windows**
+**Решение:** Используем Python прокси + client-side monkey-patches
+
+**Шаг 1: Запустите браузер на Windows (port 9222)**
 
 ```cmd
 "C:\Users\<USERNAME>\AppData\Local\Perplexity\Comet\Application\Comet.exe" --remote-debugging-port=9222
 ```
 
-**Шаг 2: Включите службу IP Helper (ВАЖНО!)**
+**Шаг 2: Запустите прокси на Windows (port 9224)**
 
-В Windows PowerShell от администратора:
+**ВАЖНО:** Прокси должен быть запущен НА WINDOWS, а не в WSL!
+
+**Способ A: Из Windows PowerShell**
 ```powershell
-# Запустить службу
-net start iphlpsvc
-
-# Настроить автозапуск
-Set-Service -Name iphlpsvc -StartupType Automatic
+# Откройте PowerShell (НЕ нужны права администратора)
+cd C:\Users\<USERNAME>\mcp_comet_for_claude_code
+python windows_proxy.py
 ```
 
-**Шаг 3: Настройте проброс портов**
-
-```powershell
-# Добавить проброс портов
-netsh interface portproxy add v4tov4 listenport=9222 listenaddress=0.0.0.0 connectport=9222 connectaddress=127.0.0.1
-
-# Проверить настройку
-netsh interface portproxy show all
+**Способ B: Из WSL с помощью PowerShell.exe**
+```bash
+# Из WSL-терминала запустить прокси на Windows
+# Замените путь на ваш Windows путь к репозиторию
+powershell.exe -Command "cd 'C:\Users\<USERNAME>\mcp_comet_for_claude_code'; python windows_proxy.py"
 ```
 
 Вы должны увидеть:
 ```
-Listen on ipv4:             Connect to ipv4:
-Address         Port        Address         Port
---------------- ----------  --------------- ----------
-0.0.0.0         9222        127.0.0.1       9222
+[*] CDP Proxy listening on 0.0.0.0:9224
+[*] Forwarding to 127.0.0.1:9222
+[*] Press Ctrl+C to stop
 ```
 
-**Шаг 4: Настройте брандмауэр Windows**
-
-```powershell
-New-NetFirewallRule -DisplayName "WSL2 Chrome DevTools" -Direction Inbound -LocalPort 9222 -Protocol TCP -Action Allow
-```
-
-**Шаг 5: Проверка из WSL**
+**Шаг 3: Проверка из WSL**
 
 ```bash
 # Получить IP Windows хоста
 WINDOWS_HOST=$(cat /etc/resolv.conf | grep nameserver | awk '{print $2}')
 echo "Windows host IP: $WINDOWS_HOST"
 
-# Проверить доступ к браузеру
-curl http://$WINDOWS_HOST:9222/json/version
+# Проверить доступ через прокси (port 9224)
+curl http://$WINDOWS_HOST:9224/json/version
 ```
 
 Должен вернуться JSON с информацией о браузере.
 
-#### Автоматическая настройка
+**Шаг 4: Запустите MCP-сервер в WSL**
 
-Используйте скрипт `fix_portproxy.ps1` (в PowerShell от администратора):
+```bash
+cd ~/mcp_comet_for_claude_code
+python3 server.py
+```
+
+MCP-сервер автоматически:
+- Определит IP Windows-хоста из `/etc/resolv.conf`
+- Подключится к `WINDOWS_HOST:9224`
+- Очистит proxy environment variables
+- Перепишет WebSocket URLs на стороне клиента
+
+#### Как это работает
+
+1. **windows_proxy.py** (Windows, порт 9224):
+   - Простой TCP proxy: `0.0.0.0:9224` → `127.0.0.1:9222`
+   - Исправляет HTTP `Host` header для CORS
+   - НЕ модифицирует WebSocket URLs (избегает проблем Content-Length)
+
+2. **browser/connection.py** (WSL, monkey-patches):
+   - Отключает proxy для WebSocket: очищает environment variables
+   - Переписывает WebSocket URLs: `ws://127.0.0.1:9222/` → `ws://WINDOWS_HOST:9224/`
+
+3. **server.py** (WSL):
+   - Очищает все proxy environment variables при старте
+   - Использует порт 9224 по умолчанию для WSL
+
+#### Альтернативное решение (IP Helper + portproxy)
+
+Если Python прокси не подходит, используйте классический способ через `netsh portproxy`:
+
 ```powershell
-.\fix_portproxy.ps1
+# В PowerShell от администратора
+net start iphlpsvc
+Set-Service -Name iphlpsvc -StartupType Automatic
+netsh interface portproxy add v4tov4 listenport=9222 listenaddress=0.0.0.0 connectport=9222 connectaddress=127.0.0.1
+New-NetFirewallRule -DisplayName "WSL2 Chrome DevTools" -Direction Inbound -LocalPort 9222 -Protocol TCP -Action Allow
+```
+
+Затем измените в `browser/connection.py`:
+```python
+def __init__(self, debug_port = 9222, debug_host: str = None):  # вместо 9224
 ```
 
 #### Troubleshooting WSL
 
-**Если не работает после перезагрузки:**
+**Прокси не запускается на Windows:**
+- Убедитесь, что у вас установлен Python на Windows (не только в WSL)
+- Проверьте что порт 9224 свободен: `netstat -ano | findstr :9224`
 
-1. Проверьте службу IP Helper:
-```powershell
-Get-Service iphlpsvc
-# Если Stopped:
-net start iphlpsvc
-```
+**WebSocket connection refused:**
+- Проверьте, что прокси запущен И видно из WSL: `curl http://$WINDOWS_HOST:9224/json`
+- Убедитесь, что используется порт 9224, а не 9222
+- Проверьте, что нет внешних proxy в environment: `env | grep -i proxy`
 
-2. Проверьте правило portproxy:
-```powershell
-netsh interface portproxy show all
-# Если пусто - пересоздайте правило
-```
-
-**Альтернативное решение:** Если IP Helper не работает, используйте Python прокси `chrome_proxy.py`:
-```bash
-python3 chrome_proxy.py
-# Затем подключайтесь к localhost:9223 вместо IP Windows хоста
-```
-
-Подробнее: см. файлы `SOLUTION.md` и `fix_comet_wsl.md` в репозитории.
+**Подробная документация:**
+- Полное описание: `.claude/CLAUDE.md` → раздел "WSL2 Setup"
+- Troubleshooting: `docs/troubleshooting.md`
 
 ### 3. Проверьте окружение
 
 ```bash
-python check_env.py
+python3 check_env.py
 ```
 
 Вы должны увидеть:
@@ -184,13 +218,17 @@ MCP Comet Browser - Environment Check
 
 ✓ Python 3.10.x (required: >= 3.10)
 ✓ pychrome is installed (version: 0.2.4)
-✓ Chrome DevTools Protocol is accessible on port 9222
+✓ Chrome DevTools Protocol is accessible
   Browser: Chrome/120.0.6099.109
 
 ============================================================
 ✓ All checks passed! Environment is ready.
 ============================================================
 ```
+
+**Примечание:**
+- Для локального использования: проверяется порт 9222
+- Для WSL: проверяется порт 9224 (через windows_proxy.py)
 
 ## Подключение к Claude Code
 
@@ -448,10 +486,10 @@ python server.py
 - Перезапустите Claude Code
 - Сервер теперь автоматически переподключается к браузеру
 
-**Ошибка: "Failed to connect to browser on port 9222"**
+**Ошибка: "Failed to connect to browser"**
 - Убедитесь, что Comet запущен с флагом `--remote-debugging-port=9222`
-- Проверьте порт: `lsof -i :9222` (Linux/macOS) или `netstat -ano | findstr :9222` (Windows)
-- Для WSL: убедитесь, что настроены брандмауэр и проброс портов (см. раздел "Настройка для WSL")
+- **Локально:** Проверьте порт: `lsof -i :9222` (Linux/macOS) или `netstat -ano | findstr :9222` (Windows)
+- **Для WSL:** Убедитесь, что `windows_proxy.py` запущен на Windows (порт 9224) - см. раздел "Настройка для WSL"
 
 **DevTools команды не работают?**
 - Обновите сервер: `git pull`
@@ -471,15 +509,54 @@ git pull
 
 ```
 mcp_comet_for_claude_code/
-├── server.py           # Основной MCP-сервер
-├── mcp.json            # Манифест MCP
-├── check_env.py        # Проверка окружения
-├── requirements.txt    # Зависимости Python
-├── README.md           # Эта инструкция
+├── server.py                    # Точка входа MCP-сервера
+├── windows_proxy.py             # Python прокси для WSL (запускается на Windows)
+├── check_env.py                # Проверка окружения
+├── requirements.txt            # Зависимости Python
+├── README.md                   # Эта инструкция
+├── .claude/
+│   └── CLAUDE.md               # Полная документация для Claude Code
+├── mcp/
+│   ├── protocol.py             # JSON-RPC 2.0 обработчик
+│   ├── logging_config.py       # Structured logging
+│   └── errors.py               # Typed exceptions hierarchy
+├── browser/
+│   ├── connection.py           # Подключение к браузеру (с monkey-patches)
+│   ├── async_cdp.py            # Thread-safe async CDP wrapper
+│   └── cursor.py               # Визуальный AI-курсор
+├── commands/
+│   ├── base.py                 # Базовый класс Command
+│   ├── context.py              # CommandContext для DI
+│   ├── registry.py             # Auto-discovery через @register
+│   ├── navigation.py           # open_url, get_text
+│   ├── interaction.py          # click, click_by_text, scroll_page, move_cursor
+│   ├── tabs.py                 # list_tabs, create_tab, close_tab, switch_tab
+│   ├── devtools.py             # open_devtools, console_command, get_console_logs
+│   ├── evaluation.py           # evaluate_js
+│   ├── screenshot.py           # screenshot
+│   ├── search.py               # find_elements, get_page_structure
+│   ├── save_page_info.py       # save_page_info (главный инструмент)
+│   ├── helpers.py              # debug_element, force_click
+│   └── diagnostics.py          # diagnose_page, get_clickable_elements
+├── utils/
+│   └── json_optimizer.py       # JSON optimization для save_page_info
 └── docs/
-    ├── prompt.yaml     # Техническое задание
-    └── examples.json   # Примеры MCP-запросов
+    ├── examples.json           # Примеры MCP-запросов
+    ├── devtools_examples.md    # Примеры DevTools команд
+    ├── troubleshooting.md      # Устранение неполадок
+    └── roadmap-v2.md           # История рефакторинга V2
 ```
+
+### Архитектура V2 (Roadmap V2 Refactored)
+
+**Ключевые улучшения:**
+- **Command metadata as class attributes** - метаданные теперь class attributes (не @property)
+- **Structured logging** - централизованная конфигурация, все `print()` → `logger`
+- **Error hierarchy** - типизированные исключения с JSON-RPC кодами
+- **Dependency Injection** - CommandContext для управления зависимостями
+- **Auto-discovery** - команды регистрируются через `@register` декоратор
+- **Async CDP wrapper** - thread-safe wrapper для pychrome
+- **JSON optimization** - оптимизация вывода save_page_info (58.8% сокращение)
 
 ## Лицензия
 
