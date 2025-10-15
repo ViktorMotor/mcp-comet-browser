@@ -1,0 +1,22 @@
+# Development and Testing Dependencies
+# Install with: pip install -r requirements-dev.txt
+
+# Testing Framework
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+pytest-mock>=3.11.1
+
+# Coverage Reporting
+coverage>=7.3.0
+
+# Code Quality
+black>=23.7.0
+flake8>=6.1.0
+mypy>=1.5.0
+
+# Mocking
+responses>=0.23.0
+
+# Image optimization (optional, for screenshot command)
+Pillow>=10.0.0

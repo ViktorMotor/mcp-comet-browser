@@ -18,17 +18,21 @@ class JsonOptimizer:
         Returns:
             Optimized page info (2-3KB instead of 10KB)
         """
+        # Handle None input
+        if data is None:
+            return {}
+
         if full:
             return data  # No optimization for debugging
 
         optimized = {
             "url": data.get("url", ""),
-            "title": data.get("title", "")[:50],  # Truncate long titles
+            "title": data.get("title", "")[:50] if data.get("title") else "",  # Truncate long titles
             "viewport": data.get("viewport", {}),
             "summary": data.get("summary", {}),
             "console": JsonOptimizer._optimize_console(data.get("console", {})),
             "network": JsonOptimizer._optimize_network(data.get("network", {})),
-            "elements": JsonOptimizer._optimize_elements(data.get("interactive_elements", []))
+            "interactive_elements": JsonOptimizer._optimize_elements(data.get("interactive_elements", []))
         }
 
         return optimized
@@ -52,20 +56,20 @@ class JsonOptimizer:
         }
 
     @staticmethod
-    def _optimize_elements(elements: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
+    def _optimize_elements(elements: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
         Optimize interactive elements:
         1. Remove null fields
         2. Truncate long className
         3. Deduplicate
         4. Prioritize top-20 by importance
-        5. Group by type
+        5. Return flat list (not grouped)
         """
         if not elements:
-            return {"buttons": [], "links": [], "other": []}
+            return []
 
-        # Step 1: Clean each element
-        cleaned = [JsonOptimizer._clean_element(el) for el in elements]
+        # Step 1: Clean each element (filter out None)
+        cleaned = [JsonOptimizer._clean_element(el) for el in elements if el is not None and isinstance(el, dict)]
 
         # Step 2: Deduplicate (same text + tag + similar y position)
         deduplicated = JsonOptimizer._deduplicate_elements(cleaned)
@@ -76,19 +80,11 @@ class JsonOptimizer:
         # Step 4: Take top 15 (stricter limit for size)
         top_elements = sorted(scored, key=lambda x: x["_score"], reverse=True)[:15]
 
-        # Step 5: Remove score field and group by type
-        grouped = {"buttons": [], "links": [], "other": []}
+        # Step 5: Remove score field
         for el in top_elements:
             el.pop("_score", None)  # Remove internal score
-            tag = el.get("tag", "")
-            if tag == "button" or el.get("role") == "button":
-                grouped["buttons"].append(el)
-            elif tag == "a":
-                grouped["links"].append(el)
-            else:
-                grouped["other"].append(el)
 
-        return grouped
+        return top_elements
 
     @staticmethod
     def _clean_element(element: Dict[str, Any]) -> Dict[str, Any]:
