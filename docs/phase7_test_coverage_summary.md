@@ -1,8 +1,8 @@
 # Phase 7: Expand Test Coverage - In Progress ⏳
 
 **Date:** 2025-10-15
-**Status:** Partial completion (screenshot + navigation + tabs + context + save_page_info + page_snapshot tests complete)
-**Tests:** 286/286 passing (+181 new tests)
+**Status:** Partial completion (screenshot + navigation + tabs + context + save_page_info + page_snapshot + search tests complete)
+**Tests:** 329/329 passing (+224 new tests)
 **Coverage:** 51% (was 31%, +20% improvement) 🎉
 
 ---
@@ -138,6 +138,7 @@ def setup_module():
 | `commands/context.py` | 44% | **100%** | **+56%** ✅ |
 | `commands/save_page_info.py` | 48% | **100%** | **+52%** ✅ |
 | `commands/page_snapshot.py` | 82% | **100%** | **+18%** ✅ |
+| `commands/search.py` | 79% | **100%** | **+21%** ✅ |
 | `commands/registry.py` | 39% | **80%** | +41% |
 | `utils/validators.py` | - | **98%** | New |
 | `utils/json_optimizer.py` | - | **99%** | New |
@@ -148,7 +149,6 @@ def setup_module():
 ### Commands Still Needing Tests:
 | Command | Current Coverage | Target | Priority |
 |---------|-----------------|--------|----------|
-| `search.py` | 79% | 90% | High |
 | `devtools_report.py` | 83% | 90% | High |
 | `interaction.py` | 22% | 60% | Medium |
 | `evaluation.py` | 21% | 60% | Medium |
@@ -535,14 +535,90 @@ async def test_screenshot_element_selector_validation(self, command_context):
 
 ---
 
+### 10. **Created Search Test Suite ✅**
+
+**File:** `tests/unit/test_search.py` (478 lines, 43 tests)
+
+**Coverage Improvement:**
+- Before: **79%** (partial implementation coverage)
+- After: **100%** (full statement coverage)
+- **+21% improvement**, all 19 statements covered
+
+**Test Classes:**
+
+#### `TestFindElementsCommand` (9 tests)
+- ✅ `test_execute_redirects_to_page_scraper` - Redirects to PageScraper.scrape_and_save()
+- ✅ `test_execute_with_text_param` - Accepts text parameter
+- ✅ `test_execute_with_tag_param` - Accepts tag parameter
+- ✅ `test_execute_with_attribute_params` - Accepts attribute and attribute_value
+- ✅ `test_execute_with_visible_only_param` - Accepts visible_only parameter
+- ✅ `test_execute_with_limit_param` - Accepts limit parameter
+- ✅ `test_execute_with_all_params` - Accepts all 6 parameters simultaneously
+- ✅ `test_execute_default_params` - Uses defaults (visible_only=True, limit=20)
+- ✅ `test_execute_passes_cdp_context` - Passes CDP context to PageScraper
+
+#### `TestGetPageStructureCommand` (5 tests)
+- ✅ `test_execute_redirects_to_page_scraper` - Redirects to PageScraper.scrape_and_save()
+- ✅ `test_execute_with_include_text_true` - Accepts include_text=True
+- ✅ `test_execute_with_include_text_false` - Accepts include_text=False
+- ✅ `test_execute_default_params` - Uses default (include_text=True)
+- ✅ `test_execute_passes_cdp_context` - Passes CDP context to PageScraper
+
+#### `TestSearchErrorHandling` (4 tests)
+- ✅ `test_find_elements_handles_page_scraper_error` - PageScraper error propagation
+- ✅ `test_find_elements_handles_page_scraper_exception` - PageScraper exception handling
+- ✅ `test_get_page_structure_handles_page_scraper_error` - Error propagation
+- ✅ `test_get_page_structure_handles_page_scraper_exception` - Exception handling
+
+#### `TestFindElementsMetadata` (11 tests)
+- ✅ `test_command_name` - name == "find_elements"
+- ✅ `test_command_description` - Descriptive text with redirection info
+- ✅ `test_input_schema_structure` - Valid schema structure
+- ✅ `test_input_schema_text` - text parameter (string)
+- ✅ `test_input_schema_tag` - tag parameter (string)
+- ✅ `test_input_schema_attribute` - attribute parameter (string)
+- ✅ `test_input_schema_attribute_value` - attribute_value parameter (string)
+- ✅ `test_input_schema_visible_only` - visible_only parameter (boolean, default True)
+- ✅ `test_input_schema_limit` - limit parameter (integer, default 20)
+- ✅ `test_no_required_parameters` - All params have defaults
+- ✅ `test_to_mcp_tool` - MCP tool format conversion
+
+#### `TestGetPageStructureMetadata` (10 tests)
+- ✅ `test_command_name` - name == "get_page_structure"
+- ✅ `test_command_description` - Descriptive text with redirection info
+- ✅ `test_input_schema_structure` - Valid schema structure
+- ✅ `test_input_schema_include_text` - include_text parameter (boolean, default True)
+- ✅ `test_no_required_parameters` - All params have defaults
+- ✅ `test_requires_browser_false` - No browser dependency
+- ✅ `test_requires_cursor_false` - No cursor dependency
+- ✅ `test_to_mcp_tool` - MCP tool format conversion
+
+#### `TestSearchIntegration` (4 tests)
+- ✅ `test_find_elements_full_workflow_success` - Complete workflow: execute → PageScraper → success
+- ✅ `test_get_page_structure_full_workflow_success` - Complete workflow with data preview
+- ✅ `test_find_elements_command_initialization` - Command initializes correctly
+- ✅ `test_get_page_structure_command_initialization` - Initialization verification
+
+**Key Features Tested:**
+1. **Redirection Logic:** Both commands redirect to PageScraper.scrape_and_save()
+2. **Parameter Handling:** FindElementsCommand accepts 6 params, GetPageStructureCommand accepts 1
+3. **Default Values:** visible_only=True, limit=20, include_text=True
+4. **CDP Integration:** CDP context passed from CommandContext
+5. **Error Handling:** PageScraper errors propagated correctly
+6. **Metadata:** Command registration, schema validation, dependencies
+7. **No Required Parameters:** All parameters have defaults
+
+**Implementation Notes:**
+- Both commands are simple wrappers around PageScraper
+- Parameters are accepted but not yet used by PageScraper (future enhancement)
+- Always redirects to ./page_info.json (no custom output path)
+- Tests mock PageScraper to isolate search command logic
+
+---
+
 ## 🚀 Next Steps (Remaining Phase 7 Tasks)
 
-### Priority 1: Search Tests
-- **File:** `tests/unit/test_search.py` (new)
-- **Target:** 79% → 90% coverage
-- **Focus:** find_elements, get_page_structure redirection
-
-### Priority 3: DevTools Report Tests
+### Priority 1: DevTools Report Tests
 - **File:** `tests/unit/test_devtools_report.py` (new)
 - **Target:** 83% → 90% coverage
 - **Focus:** devtools_report redirection, error handling
@@ -586,7 +662,7 @@ async def test_screenshot_element_selector_validation(self, command_context):
 
 ---
 
-## ✅ Phase 7 Partial Complete - 50% Coverage Milestone! 🎉
+## ✅ Phase 7 Partial Complete - 51% Coverage Milestone! 🎉
 
 **Summary:**
 - ✅ Screenshot command coverage: 17% → **69%** (+52%)
@@ -594,16 +670,17 @@ async def test_screenshot_element_selector_validation(self, command_context):
 - ✅ Tabs command coverage: 25% → **100%** (+75%)
 - ✅ Context command coverage: 44% → **100%** (+56%)
 - ✅ Save Page Info coverage: 48% → **100%** (+52%)
-- ✅ Page Snapshot coverage: 82% → **100%** (+18%) ⭐ NEW
+- ✅ Page Snapshot coverage: 82% → **100%** (+18%)
+- ✅ Search coverage: 79% → **100%** (+21%) ⭐ NEW
 - ✅ Overall coverage: 31% → **51%** (+20%) 🎉
-- ✅ 181 new tests added (all passing: 286/286)
+- ✅ 224 new tests added (all passing: 329/329)
 - ✅ Fixed validation exception propagation
 - ✅ Fixed registry test discovery issue
-- ⏳ search, devtools_report tests pending
+- ⏳ devtools_report tests pending
 
-**Version:** V2.1 → V2.2 (Phase 7 partial)
+**Version:** V2.1 → V2.6 → V2.7 (Phase 7 partial)
 
-**Next Task:** Continue with search.py tests (Priority 1)
+**Next Task:** Continue with devtools_report.py tests (Priority 1)
 
 ---
 
