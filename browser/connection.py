@@ -299,7 +299,7 @@ class BrowserConnection:
         self.tab.Console.messageAdded = console_message_handler
 
         # Also set up Runtime.consoleAPICalled listener (more reliable)
-        def console_api_handler(method, **kwargs):
+        def console_api_handler(**kwargs):
             """Handle Runtime.consoleAPICalled events"""
             try:
                 log_type = kwargs.get("type", "log")
@@ -338,7 +338,7 @@ class BrowserConnection:
         self.tab.set_listener("Runtime.consoleAPICalled", console_api_handler)
 
         # Also capture exceptions
-        def exception_handler(method, **kwargs):
+        def exception_handler(**kwargs):
             """Handle Runtime.exceptionThrown events"""
             try:
                 exception_details = kwargs.get("exceptionDetails", {})

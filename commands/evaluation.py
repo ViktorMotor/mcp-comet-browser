@@ -131,9 +131,14 @@ Examples:
             let resultType = 'undefined';
 
             try {{
-                // Wrap in IIFE to allow both expressions and statements
-                const userFunction = new Function(`{escaped_code}`);
-                result = userFunction();
+                // Try as expression first (most common case)
+                try {{
+                    result = eval(`{escaped_code}`);
+                }} catch (e) {{
+                    // If eval fails (syntax error), try as function body with return
+                    const userFunction = new Function(`{escaped_code}`);
+                    result = userFunction();
+                }}
 
                 // Determine type
                 if (result === null) {{
