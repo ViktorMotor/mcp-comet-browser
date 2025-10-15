@@ -1,9 +1,9 @@
 # Phase 7: Expand Test Coverage - In Progress ⏳
 
 **Date:** 2025-10-15
-**Status:** Partial completion (screenshot + navigation + tabs + context + save_page_info + page_snapshot + search + devtools_report + interaction + devtools tests complete)
-**Tests:** 485/485 passing (+438 new tests)
-**Coverage:** 64% (was 31%, +33% improvement) 🎉
+**Status:** Partial completion (screenshot + navigation + tabs + context + save_page_info + page_snapshot + search + devtools_report + interaction + devtools + diagnostics tests complete)
+**Tests:** 516/516 passing (+469 new tests)
+**Coverage:** 65% (was 31%, +34% improvement) 🎉
 
 ---
 
@@ -125,8 +125,8 @@ def setup_module():
 ### Test Suite Growth:
 | Metric | Before | After | Change |
 |--------|--------|-------|--------|
-| **Total Tests** | 105 | 354 | +249 tests |
-| **Passing Tests** | 105 | 354 | +249 |
+| **Total Tests** | 105 | 516 | +411 tests |
+| **Passing Tests** | 105 | 516 | +411 |
 | **Failing Tests** | 0 | 0 | 0 |
 
 ### Coverage by Module:
@@ -153,8 +153,8 @@ def setup_module():
 |---------|-----------------|--------|----------|
 | `evaluation.py` | 98% | ✅ Done | - |
 | `devtools.py` | 100% | ✅ Done | - |
+| `diagnostics.py` | 95% | ✅ Done | - |
 | `helpers.py` | 38% | 50% | Medium |
-| `diagnostics.py` | 51% | 60% | Medium |
 | `open_devtools_url.py` | 21% | 50% | Low |
 
 ---
@@ -900,7 +900,73 @@ async def test_screenshot_element_selector_validation(self, command_context):
 
 ---
 
-## ✅ Phase 7 Partial Complete - 64% Coverage Milestone! 🎉
+### 14. **Created Diagnostics Test Suite ✅**
+
+**File:** `tests/unit/test_diagnostics.py` (940 lines, 31 tests)
+
+**Coverage Improvement:**
+- Before: **51%** (partial implementation coverage)
+- After: **95%** (near-complete statement coverage)
+- **+44% improvement**, 40 of 41 statements covered
+
+**Test Classes:**
+
+#### `TestEnableConsoleLoggingCommand` (5 tests)
+- ✅ `test_metadata` - Command metadata verification
+- ✅ `test_successful_enable_logging` - Force enable console logging via connection
+- ✅ `test_no_connection_available` - Raises ValueError when connection missing
+- ✅ `test_connection_error_during_enable` - Connection errors during enable
+- ✅ `test_to_mcp_tool` - MCP tool format conversion
+
+#### `TestDiagnosePageCommand` (9 tests)
+- ✅ `test_metadata` - Command metadata verification
+- ✅ `test_successful_page_diagnostics` - Full diagnostics with all data (URL, title, viewport, cursors, counts)
+- ✅ `test_page_with_no_active_element` - No activeElement handling
+- ✅ `test_page_loading_state` - readyState='loading' diagnostics
+- ✅ `test_page_with_devtools_open` - DevTools open detection
+- ✅ `test_page_with_large_scroll_offset` - Large scrollY handling (5000px)
+- ✅ `test_cdp_evaluation_error` - CDP connection errors
+- ✅ `test_general_exception_handling` - General exception handling
+- ✅ `test_to_mcp_tool` - MCP tool format conversion
+
+#### `TestGetClickableElementsCommand` (14 tests)
+- ✅ `test_metadata` - Command metadata with text_filter, visible_only params
+- ✅ `test_get_all_clickable_elements` - All clickable elements (button, a, [role="button"], etc.)
+- ✅ `test_filter_by_text` - Text content filtering
+- ✅ `test_visible_only_true` - Filter hidden elements (default)
+- ✅ `test_visible_only_false` - Include hidden elements
+- ✅ `test_elements_with_disabled_state` - disabled attribute handling
+- ✅ `test_elements_with_onclick_handler` - onclick handler detection
+- ✅ `test_limit_to_50_elements` - Limit to 50 elements (slice(0, 50))
+- ✅ `test_text_filter_with_special_characters` - Apostrophe escaping
+- ✅ `test_no_clickable_elements_found` - Empty results handling
+- ✅ `test_text_truncation_to_60_chars` - Text truncation (substring(0, 60))
+- ✅ `test_cdp_evaluation_error` - CDP connection errors
+- ✅ `test_general_exception_handling` - General exception handling
+- ✅ `test_to_mcp_tool` - MCP tool format conversion
+
+#### `TestDiagnosticsCommandsMetadata` (3 tests)
+- ✅ `test_enable_console_logging_to_mcp_tool` - MCP tool conversion
+- ✅ `test_diagnose_page_to_mcp_tool` - MCP tool conversion
+- ✅ `test_get_clickable_elements_to_mcp_tool` - MCP tool conversion
+
+**Key Features Tested:**
+1. **Page Diagnostics:** URL, title, readyState, activeElement, viewport (width, height, scroll), cursors (AI cursor, console interceptor), element counts (buttons, links, inputs, tabs), DevTools state
+2. **Clickable Elements Detection:** button, a, [role="button"], [role="tab"], [onclick], input[type="button/submit"], [tabindex]
+3. **Text Filtering:** textContent.includes() filtering with special character escaping
+4. **Visibility Detection:** getBoundingClientRect, getComputedStyle (display, visibility, opacity)
+5. **Element Attributes:** tag, text, id, role, ariaLabel, position, hasClickHandler, disabled
+6. **Console Logging:** Force enable console logging via BrowserConnection
+7. **Error Handling:** CDP errors, connection errors, graceful exception handling
+
+**Coverage Highlights:**
+- **95% statement coverage** (40/41 statements)
+- **50% branch coverage** (1/2 branches)
+- Only 1 missed line: diagnostics.py:24 (connection.force_enable_console_logging error path)
+
+---
+
+## ✅ Phase 7 Partial Complete - 65% Coverage Milestone! 🎉
 
 **Summary:**
 - ✅ Screenshot command coverage: 17% → **69%** (+52%)
@@ -912,15 +978,16 @@ async def test_screenshot_element_selector_validation(self, command_context):
 - ✅ Search coverage: 79% → **100%** (+21%)
 - ✅ DevTools Report coverage: 83% → **100%** (+17%)
 - ✅ Interaction coverage: 22% → **99%** (+77%)
-- ✅ DevTools coverage: 33% → **100%** (+67%) ⭐ NEW
-- ✅ Overall coverage: 31% → **64%** (+33%) 🎉
-- ✅ 438 new tests added (all passing: 485/485)
+- ✅ DevTools coverage: 33% → **100%** (+67%)
+- ✅ Diagnostics coverage: 51% → **95%** (+44%) ⭐ NEW
+- ✅ Overall coverage: 31% → **65%** (+34%) 🎉
+- ✅ 469 new tests added (all passing: 516/516)
 - ✅ Fixed validation exception propagation
 - ✅ Fixed registry test discovery issue
 
-**Version:** V2.1 → V2.6 → V2.7 → V2.8 → V2.9 → V2.10 → **V2.11** (Phase 7 partial)
+**Version:** V2.1 → V2.6 → V2.7 → V2.8 → V2.9 → V2.10 → V2.11 → **V2.12** (Phase 7 partial)
 
-**Next Task:** Continue with evaluation.py tests (Priority 1) or helpers.py/diagnostics.py
+**Next Task:** Continue with helpers.py tests (38% → 50%) or open_devtools_url.py (21% → 50%)
 
 ---
 
