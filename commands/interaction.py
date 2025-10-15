@@ -4,6 +4,8 @@ from typing import Dict, Any, Optional
 from .base import Command
 from .registry import register
 from mcp.logging_config import get_logger
+from mcp.errors import InvalidArgumentError, CommandError
+from utils.validators import Validators
 
 logger = get_logger("commands.interaction")
 
@@ -27,6 +29,9 @@ class ClickCommand(Command):
     async def execute(self, selector: str, show_cursor: bool = True, **kwargs) -> Dict[str, Any]:
         """Execute click with multiple strategies and cursor animation"""
         try:
+            # Validate selector
+            selector = Validators.validate_selector(selector, "selector", allow_xpath=True)
+
             # Always initialize and show cursor
             cursor = self.context.cursor
             if cursor:
@@ -243,6 +248,9 @@ Tip: Use save_page_info() first to see available elements and verify click worke
     async def execute(self, text: str, tag: Optional[str] = None, exact: bool = False, **kwargs) -> Dict[str, Any]:
         """Execute click by text with cursor animation"""
         try:
+            # Validate text
+            text = Validators.validate_string_length(text, "text", min_length=1, max_length=500)
+
             # Always initialize and show cursor
             cursor = self.context.cursor
             if cursor:
@@ -543,6 +551,18 @@ class ScrollPageCommand(Command):
                      selector: Optional[str] = None) -> Dict[str, Any]:
         """Execute scroll operation"""
         try:
+            # Validate coordinates if provided
+            if x is not None or y is not None:
+                x, y = Validators.validate_coordinates(x, y, allow_negative=False)
+
+            # Validate selector if provided
+            if selector:
+                selector = Validators.validate_selector(selector, "selector")
+
+            # Validate amount if provided
+            if amount is not None:
+                amount = int(Validators.validate_range(amount, "amount", min_value=0, max_value=50000))
+
             # Build JavaScript based on parameters
             if x is not None and y is not None:
                 js_code = f"""
@@ -661,6 +681,17 @@ class MoveCursorCommand(Command):
                      selector: Optional[str] = None, duration: int = 400, **kwargs) -> Dict[str, Any]:
         """Execute cursor movement"""
         try:
+            # Validate coordinates if provided
+            if x is not None or y is not None:
+                x, y = Validators.validate_coordinates(x, y, allow_negative=False)
+
+            # Validate selector if provided
+            if selector:
+                selector = Validators.validate_selector(selector, "selector")
+
+            # Validate duration
+            duration = int(Validators.validate_range(duration, "duration", min_value=0, max_value=10000))
+
             if selector:
                 js_code = f"""
                 (function() {{

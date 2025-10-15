@@ -1,8 +1,16 @@
 """Navigation commands: open_url, get_text"""
 import asyncio
 from typing import Dict, Any
+from urllib.parse import urlparse
 from .base import Command
 from .registry import register
+from mcp.errors import (
+    CommandError,
+    CommandTimeoutError,
+    ElementNotFoundError,
+    InvalidArgumentError,
+    CDPError
+)
 
 
 @register
@@ -24,19 +32,35 @@ class OpenUrlCommand(Command):
 
     async def execute(self, url: str, **kwargs) -> Dict[str, Any]:
         """Navigate to URL and reinitialize cursor"""
+        # Validate URL
+        parsed = urlparse(url)
+        if not parsed.scheme:
+            raise InvalidArgumentError(
+                argument="url",
+                expected="valid URL with scheme (http:// or https://)",
+                received=url
+            )
+
         try:
             await self.cdp.navigate(url=url, timeout=30)
-            # Wait for page load
-            await asyncio.sleep(2)
-
-            # Re-initialize cursor after page load (navigation clears it)
-            cursor = self.context.cursor
-            if cursor:
-                await cursor.initialize()
-
-            return {"success": True, "url": url, "message": f"Opened {url}"}
+        except asyncio.TimeoutError:
+            raise CommandTimeoutError(command="open_url", timeout_seconds=30)
         except Exception as e:
-            raise RuntimeError(f"Failed to open URL: {str(e)}")
+            raise CDPError(f"Failed to navigate to URL: {str(e)}")
+
+        # Wait for page load
+        await asyncio.sleep(2)
+
+        # Re-initialize cursor after page load (navigation clears it)
+        cursor = self.context.cursor
+        if cursor:
+            try:
+                await cursor.initialize()
+            except Exception as e:
+                # Cursor init failure is not critical
+                pass
+
+        return {"success": True, "url": url, "message": f"Opened {url}"}
 
 
 @register
@@ -57,17 +81,25 @@ class GetTextCommand(Command):
 
     async def execute(self, selector: str) -> Dict[str, Any]:
         """Extract text content from selected element"""
+        # Validate selector (basic check)
+        if not selector or not selector.strip():
+            raise InvalidArgumentError(
+                argument="selector",
+                expected="non-empty CSS selector",
+                received=selector
+            )
+
         try:
             # Query selector using AsyncCDP
             result = await self.cdp.query_selector(selector=selector)
 
             if not result.get('nodeId'):
-                return {"success": False, "text": "", "message": f"No element found for selector: {selector}"}
+                raise ElementNotFoundError(selector=selector)
 
-            # Use JS to get text content
+            # Use JS to get text content (escape selector properly)
             js_code = f"""
             (function() {{
-                const el = document.querySelector('{selector}');
+                const el = document.querySelector({repr(selector)});
                 return el ? el.textContent.trim() : '';
             }})()
             """
@@ -76,5 +108,7 @@ class GetTextCommand(Command):
             text = eval_result.get('result', {}).get('value', '')
 
             return {"success": True, "text": text, "selector": selector}
+        except ElementNotFoundError:
+            raise
         except Exception as e:
-            raise RuntimeError(f"Failed to get text: {str(e)}")
+            raise CommandError(f"Failed to get text from '{selector}': {str(e)}")

@@ -2,6 +2,7 @@
 from typing import Dict, Any, Optional
 from .base import Command
 from .registry import register
+from mcp.errors import BrowserError, TabNotFoundError, InvalidArgumentError
 
 
 @register
@@ -40,7 +41,7 @@ class ListTabsCommand(Command):
                 "currentTabId": getattr(current_tab, 'id', None) if current_tab else None
             }
         except Exception as e:
-            raise RuntimeError(f"Failed to list tabs: {str(e)}")
+            raise BrowserError(f"Failed to list tabs: {str(e)}")
 
 
 @register
@@ -60,6 +61,17 @@ class CreateTabCommand(Command):
 
     async def execute(self, url: Optional[str] = None, **kwargs) -> Dict[str, Any]:
         """Create new tab with optional URL"""
+        # Validate URL if provided
+        if url:
+            from urllib.parse import urlparse
+            parsed = urlparse(url)
+            if not parsed.scheme:
+                raise InvalidArgumentError(
+                    argument="url",
+                    expected="valid URL with scheme",
+                    received=url
+                )
+
         try:
             browser = self.context.browser
             new_tab = browser.new_tab(url=url)
@@ -71,7 +83,7 @@ class CreateTabCommand(Command):
                 "message": f"Created new tab{' and opened ' + url if url else ''}"
             }
         except Exception as e:
-            raise RuntimeError(f"Failed to create tab: {str(e)}")
+            raise BrowserError(f"Failed to create tab: {str(e)}")
 
 
 @register
@@ -99,9 +111,9 @@ class CloseTabCommand(Command):
                 if current_tab:
                     tab_id = getattr(current_tab, 'id', None)
                     if not tab_id:
-                        return {"success": False, "message": "Current tab has no ID"}
+                        raise BrowserError("Current tab has no ID")
                 else:
-                    return {"success": False, "message": "No current tab to close"}
+                    raise BrowserError("No current tab to close")
 
             # Find tab by ID
             tabs = browser.list_tab()
@@ -112,7 +124,7 @@ class CloseTabCommand(Command):
                     break
 
             if not tab_to_close:
-                return {"success": False, "message": f"Tab not found: {tab_id}"}
+                raise TabNotFoundError(message=f"Tab not found: {tab_id}", tab_id=tab_id)
 
             # Close the tab
             browser.close_tab(tab_to_close)
@@ -124,8 +136,10 @@ class CloseTabCommand(Command):
                 "message": f"Closed tab: {tab_id}",
                 "wasCurrentTab": current_tab and getattr(current_tab, 'id', None) == tab_id
             }
+        except (BrowserError, TabNotFoundError):
+            raise
         except Exception as e:
-            raise RuntimeError(f"Failed to close tab: {str(e)}")
+            raise BrowserError(f"Failed to close tab: {str(e)}")
 
 
 @register
@@ -159,7 +173,7 @@ class SwitchTabCommand(Command):
                     break
 
             if not target_tab:
-                return {"success": False, "message": f"Tab not found: {tab_id}"}
+                raise TabNotFoundError(message=f"Tab not found: {tab_id}", tab_id=tab_id)
 
             # Stop current tab
             if current_tab:
@@ -187,5 +201,7 @@ class SwitchTabCommand(Command):
                 "message": f"Switched to tab: {tab_id}",
                 "newTab": target_tab  # Return tab object so caller can update reference
             }
+        except TabNotFoundError:
+            raise
         except Exception as e:
-            raise RuntimeError(f"Failed to switch tab: {str(e)}")
+            raise BrowserError(f"Failed to switch tab: {str(e)}")

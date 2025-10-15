@@ -51,6 +51,12 @@ class Command(ABC):
         self.tab = context.tab  # Backward compatibility
         self.cdp = context.cdp  # AsyncCDP wrapper
 
+        # Inject dependencies based on requirements
+        self.cursor = context.cursor if self.requires_cursor else None
+        self.browser = context.browser if self.requires_browser else None
+        self.console_logs = context.console_logs if self.requires_console_logs else None
+        self.connection = context.connection if self.requires_connection else None
+
     @abstractmethod
     async def execute(self, **kwargs) -> Dict[str, Any]:
         """Execute the command
