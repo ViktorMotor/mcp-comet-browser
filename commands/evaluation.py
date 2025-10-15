@@ -135,9 +135,14 @@ Examples:
                 try {{
                     result = eval(`{escaped_code}`);
                 }} catch (e) {{
-                    // If eval fails (syntax error), try as function body with return
-                    const userFunction = new Function(`{escaped_code}`);
-                    result = userFunction();
+                    // If eval fails, try wrapping in parentheses (for object literals)
+                    try {{
+                        result = eval(`({escaped_code})`);
+                    }} catch (e2) {{
+                        // If still fails, try as function body with return
+                        const userFunction = new Function(`{escaped_code}`);
+                        result = userFunction();
+                    }}
                 }}
 
                 // Determine type
