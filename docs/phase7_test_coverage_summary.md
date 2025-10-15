@@ -1,9 +1,9 @@
 # Phase 7: Expand Test Coverage - In Progress ⏳
 
 **Date:** 2025-10-15
-**Status:** Partial completion (screenshot + navigation + tabs + context + save_page_info tests complete)
-**Tests:** 265/265 passing (+160 new tests)
-**Coverage:** 50% (was 31%, +19% improvement) 🎉
+**Status:** Partial completion (screenshot + navigation + tabs + context + save_page_info + page_snapshot tests complete)
+**Tests:** 286/286 passing (+181 new tests)
+**Coverage:** 51% (was 31%, +20% improvement) 🎉
 
 ---
 
@@ -137,6 +137,7 @@ def setup_module():
 | `commands/tabs.py` | 25% | **100%** | **+75%** ✅ |
 | `commands/context.py` | 44% | **100%** | **+56%** ✅ |
 | `commands/save_page_info.py` | 48% | **100%** | **+52%** ✅ |
+| `commands/page_snapshot.py` | 82% | **100%** | **+18%** ✅ |
 | `commands/registry.py` | 39% | **80%** | +41% |
 | `utils/validators.py` | - | **98%** | New |
 | `utils/json_optimizer.py` | - | **99%** | New |
@@ -147,7 +148,6 @@ def setup_module():
 ### Commands Still Needing Tests:
 | Command | Current Coverage | Target | Priority |
 |---------|-----------------|--------|----------|
-| `page_snapshot.py` | 82% | 90% | High |
 | `search.py` | 79% | 90% | High |
 | `devtools_report.py` | 83% | 90% | High |
 | `interaction.py` | 22% | 60% | Medium |
@@ -480,14 +480,64 @@ async def test_screenshot_element_selector_validation(self, command_context):
 
 ---
 
+### 9. **Created Page Snapshot Test Suite ✅**
+
+**File:** `tests/unit/test_page_snapshot.py` (260 lines, 21 tests)
+
+**Coverage Improvement:**
+- Before: **82%** (partial implementation coverage)
+- After: **100%** (full statement coverage)
+- **+18% improvement**, all 11 statements covered
+
+**Test Classes:**
+
+#### `TestPageSnapshotCommand` (6 tests)
+- ✅ `test_execute_redirects_to_page_scraper` - Redirects to PageScraper.scrape_and_save()
+- ✅ `test_execute_with_include_styles_param` - Accepts include_styles parameter
+- ✅ `test_execute_with_max_depth_param` - Accepts max_depth parameter
+- ✅ `test_execute_with_all_params` - Accepts all parameters
+- ✅ `test_execute_default_params` - Uses defaults (include_styles=False, max_depth=3)
+- ✅ `test_execute_passes_cdp_context` - Passes CDP context to PageScraper
+
+#### `TestPageSnapshotErrorHandling` (3 tests)
+- ✅ `test_execute_handles_page_scraper_error` - PageScraper error propagation
+- ✅ `test_execute_handles_page_scraper_exception` - PageScraper exception handling
+- ✅ `test_execute_handles_import_error` - Import error graceful handling
+
+#### `TestPageSnapshotMetadata` (9 tests)
+- ✅ `test_command_name` - name == "get_page_snapshot"
+- ✅ `test_command_description` - Descriptive text with redirection info
+- ✅ `test_input_schema_structure` - Valid schema structure
+- ✅ `test_input_schema_include_styles` - include_styles parameter (boolean, default False)
+- ✅ `test_input_schema_max_depth` - max_depth parameter (integer, default 3)
+- ✅ `test_no_required_parameters` - All params have defaults
+- ✅ `test_requires_browser_false` - No browser dependency
+- ✅ `test_requires_cursor_false` - No cursor dependency
+- ✅ `test_to_mcp_tool` - MCP tool format conversion
+
+#### `TestPageSnapshotIntegration` (3 tests)
+- ✅ `test_full_workflow_success` - Complete workflow: execute → PageScraper → success
+- ✅ `test_full_workflow_failure` - Complete workflow: execute → PageScraper → failure
+- ✅ `test_command_initialization` - Command initializes correctly
+
+**Key Features Tested:**
+1. **Redirection Logic:** PageScraper.scrape_and_save() called correctly
+2. **Parameter Handling:** include_styles, max_depth accepted but not used
+3. **CDP Integration:** CDP context passed from CommandContext
+4. **Error Handling:** PageScraper errors propagated correctly
+5. **Metadata:** Command registration, schema validation, dependencies
+
+**Implementation Notes:**
+- page_snapshot.py is a simple wrapper around PageScraper
+- Parameters (include_styles, max_depth) are accepted but not yet used by PageScraper
+- Always redirects to ./page_info.json (no custom output path yet)
+- Tests mock PageScraper to isolate page_snapshot logic
+
+---
+
 ## 🚀 Next Steps (Remaining Phase 7 Tasks)
 
-### Priority 1: Page Snapshot Tests
-- **File:** `tests/unit/test_page_snapshot.py` (new)
-- **Target:** 82% → 90% coverage
-- **Focus:** PageScraper redirection, error handling
-
-### Priority 2: Search Tests
+### Priority 1: Search Tests
 - **File:** `tests/unit/test_search.py` (new)
 - **Target:** 79% → 90% coverage
 - **Focus:** find_elements, get_page_structure redirection
@@ -543,16 +593,17 @@ async def test_screenshot_element_selector_validation(self, command_context):
 - ✅ Navigation command coverage: 35% → **100%** (+65%)
 - ✅ Tabs command coverage: 25% → **100%** (+75%)
 - ✅ Context command coverage: 44% → **100%** (+56%)
-- ✅ Save Page Info coverage: 48% → **100%** (+52%) ⭐ NEW
-- ✅ Overall coverage: 31% → **50%** (+19%) 🎉
-- ✅ 160 new tests added (all passing: 265/265)
+- ✅ Save Page Info coverage: 48% → **100%** (+52%)
+- ✅ Page Snapshot coverage: 82% → **100%** (+18%) ⭐ NEW
+- ✅ Overall coverage: 31% → **51%** (+20%) 🎉
+- ✅ 181 new tests added (all passing: 286/286)
 - ✅ Fixed validation exception propagation
 - ✅ Fixed registry test discovery issue
-- ⏳ page_snapshot, search, devtools_report tests pending
+- ⏳ search, devtools_report tests pending
 
 **Version:** V2.1 → V2.2 (Phase 7 partial)
 
-**Next Task:** Continue with page_snapshot.py tests (Priority 1)
+**Next Task:** Continue with search.py tests (Priority 1)
 
 ---
 
