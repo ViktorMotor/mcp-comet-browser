@@ -124,13 +124,8 @@ Note: Requires Pillow for JPEG/resize support. Install: pip install Pillow"""
             # Remove None values
             capture_params = {k: v for k, v in capture_params.items() if v is not None}
 
-            result = await self.context.cdp.evaluate(
-                expression=f"chrome.devtools && chrome.devtools.inspectedWindow ? chrome.devtools.inspectedWindow.captureScreenshot() : null",
-                returnByValue=True
-            )
-
-            # Fallback to CDP Page.captureScreenshot
-            cdp_result = await self.tab.Page.captureScreenshot(**capture_params)
+            # Capture screenshot via CDP Page.captureScreenshot
+            cdp_result = self.tab.Page.captureScreenshot(**capture_params)
             img_data = cdp_result.get('data', '')
 
             # Decode base64
