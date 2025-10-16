@@ -1,11 +1,22 @@
 """Version information for MCP Comet Browser"""
 
-__version__ = "2.18.0"
-__version_info__ = (2, 18, 0)
+__version__ = "2.18.1"
+__version_info__ = (2, 18, 1)
 __release_date__ = "2025-10-16"
 
 # Version history
 VERSION_HISTORY = {
+    "2.18.1": {
+        "date": "2025-10-16",
+        "description": "Screenshot bugfix and AI optimization guide",
+        "changes": [
+            "Fixed screenshot command crash (removed incorrect await)",
+            "Added comprehensive AI-optimization guide (SCREENSHOT_OPTIMIZATION.md)",
+            "Recommended JPEG Q75 for 21% size reduction with perfect quality",
+            "Tested and benchmarked 4 quality levels for Claude AI",
+            "Updated screenshot command description with AI recommendations"
+        ]
+    },
     "2.18.0": {
         "date": "2025-10-16",
         "description": "Animation timing optimization for human perception",

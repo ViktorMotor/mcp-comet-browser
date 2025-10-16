@@ -1,6 +1,6 @@
 # MCP Server for Comet Browser
 
-**Версия:** 2.18.0 | **Дата релиза:** 2025-10-16
+**Версия:** 2.18.1 | **Дата релиза:** 2025-10-16
 
 MCP (Model Context Protocol) сервер для управления браузером Comet через Chrome DevTools Protocol.
 
