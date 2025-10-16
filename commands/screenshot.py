@@ -22,6 +22,11 @@ class ScreenshotCommand(Command):
     name = "screenshot"
     description = """Take screenshot of current page with optimization options.
 
+AI-Optimized Recommendations:
+- For Claude AI: format='jpeg', quality=75 (20-30% smaller, perfect readability)
+- For text pages: quality=65 (30% smaller)
+- For design review: format='png' or quality=90 (exact colors)
+
 Optimization tips:
 - Use format='jpeg' for 50-80% size reduction (default: png)
 - Use quality=60-80 for JPEG to balance quality vs size
@@ -29,6 +34,8 @@ Optimization tips:
 - Use element selector to capture specific element only
 
 Auto-saves to ./screenshots/ folder. Use Read tool to view: Read('./screenshots/screenshot.png')
+
+See SCREENSHOT_OPTIMIZATION.md for detailed benchmarks and recommendations.
 
 Note: Requires Pillow for JPEG/resize support. Install: pip install Pillow"""
     input_schema = {
