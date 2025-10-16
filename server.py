@@ -9,6 +9,8 @@ import os
 import sys
 import asyncio
 
+from __version__ import __version__, __release_date__
+
 # Clear proxy environment variables for WSL→Windows connection
 # External proxies don't work for localhost/Windows host connections
 for var in ['http_proxy', 'https_proxy', 'HTTP_PROXY', 'HTTPS_PROXY',
@@ -23,6 +25,7 @@ logger = get_logger("server")
 
 async def main():
     """Entry point for MCP Comet Server"""
+    logger.info(f"MCP Comet Browser v{__version__} ({__release_date__})")
     server = MCPJSONRPCServer()
     try:
         await server.run()

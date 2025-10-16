@@ -49,14 +49,14 @@ class AICursor:
                 style.textContent = `
                     @keyframes __ai_cursor_click__ {
                         0% { transform: scale(1); }
-                        50% { transform: scale(0.8); }
+                        50% { transform: scale(1.5); }
                         100% { transform: scale(1); }
                     }
                     #__ai_cursor__.clicking {
-                        animation: __ai_cursor_click__ 0.3s ease;
-                        background: radial-gradient(circle, rgba(34, 197, 94, 0.9) 0%, rgba(22, 163, 74, 0.7) 50%, rgba(21, 128, 61, 0.5) 100%);
-                        border-color: rgba(34, 197, 94, 1);
-                        box-shadow: 0 0 25px rgba(34, 197, 94, 0.9), 0 0 50px rgba(34, 197, 94, 0.5);
+                        animation: __ai_cursor_click__ 1s ease;
+                        background: radial-gradient(circle, rgba(34, 197, 94, 0.9) 0%, rgba(22, 163, 74, 0.7) 50%, rgba(21, 128, 61, 0.5) 100%) !important;
+                        border-color: rgba(34, 197, 94, 1) !important;
+                        box-shadow: 0 0 30px rgba(34, 197, 94, 1), 0 0 60px rgba(34, 197, 94, 0.8), 0 0 90px rgba(34, 197, 94, 0.5) !important;
                     }
                 `;
 
@@ -77,7 +77,7 @@ class AICursor:
 
                 window.__clickAICursor__ = function() {
                     cursor.classList.add('clicking');
-                    setTimeout(() => cursor.classList.remove('clicking'), 300);
+                    setTimeout(() => cursor.classList.remove('clicking'), 1000);
                 };
 
                 window.__hideAICursor__ = function() {

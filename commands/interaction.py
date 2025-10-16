@@ -40,7 +40,7 @@ class ClickCommand(Command):
             logger.debug(f"click: targeting selector '{selector}' (show_cursor={show_cursor})")
 
             js_code = f"""
-            (function() {{
+            (async function() {{
                 // Try multiple strategies to find the element
                 let el = null;
                 let strategy = '';
@@ -129,80 +129,79 @@ class ClickCommand(Command):
                 const clickX = rect.left + rect.width / 2;
                 const clickY = rect.top + rect.height / 2;
 
-                // Animate cursor
+                // Animate cursor and wait for completion
                 const showCursor = {str(show_cursor).lower()};
                 if (showCursor && window.__moveAICursor__) {{
-                    window.__moveAICursor__(clickX, clickY, 400);
+                    window.__moveAICursor__(clickX, clickY, 1000);
+                    await new Promise(r => setTimeout(r, 1000)); // Wait for cursor animation
                 }}
 
-                // Wait and click
-                return new Promise((resolve) => {{
-                    setTimeout(() => {{
-                        try {{
-                            if (showCursor && window.__clickAICursor__) {{
-                                window.__clickAICursor__();
-                            }}
+                // Show click animation and wait
+                if (showCursor && window.__clickAICursor__) {{
+                    window.__clickAICursor__();
+                    await new Promise(r => setTimeout(r, 1000)); // Wait for click flash
+                }}
 
-                            // Multiple click methods
-                            el.click();
+                // Multiple click methods
+                el.click();
 
-                            ['mousedown', 'mouseup', 'click'].forEach(eventType => {{
-                                const event = new MouseEvent(eventType, {{
-                                    view: window,
-                                    bubbles: true,
-                                    cancelable: true,
-                                    clientX: clickX,
-                                    clientY: clickY
-                                }});
-                                el.dispatchEvent(event);
-                            }});
-
-                            if (el.tagName === 'BUTTON' || el.tagName === 'INPUT' || el.tagName === 'A') {{
-                                try {{
-                                    el.focus();
-                                    if (el.onclick) el.onclick.call(el);
-                                }} catch (e3) {{}}
-                            }}
-
-                            resolve({{
-                                success: true,
-                                selector: '{selector}',
-                                strategy: strategy,
-                                message: 'Clicked element using strategy: ' + strategy,
-                                cursorAnimated: showCursor,
-                                cursorVisible: window.__aiCursor__ && window.__aiCursor__.style.display !== 'none',
-                                elementInfo: {{
-                                    tagName: el.tagName,
-                                    id: el.id,
-                                    className: el.className,
-                                    text: el.textContent.trim().substring(0, 100),
-                                    position: {{
-                                        top: rect.top,
-                                        left: rect.left,
-                                        width: rect.width,
-                                        height: rect.height,
-                                        clickX: clickX,
-                                        clickY: clickY
-                                    }},
-                                    inViewport: inViewport
-                                }}
-                            }});
-                        }} catch (clickError) {{
-                            resolve({{
-                                success: false,
-                                reason: 'click_failed',
-                                message: 'All click methods failed: ' + clickError.message,
-                                error: clickError.toString()
-                            }});
-                        }}
-                    }}, showCursor ? 450 : 0);
+                ['mousedown', 'mouseup', 'click'].forEach(eventType => {{
+                    const event = new MouseEvent(eventType, {{
+                        view: window,
+                        bubbles: true,
+                        cancelable: true,
+                        clientX: clickX,
+                        clientY: clickY
+                    }});
+                    el.dispatchEvent(event);
                 }});
+
+                if (el.tagName === 'BUTTON' || el.tagName === 'INPUT' || el.tagName === 'A') {{
+                    try {{
+                        el.focus();
+                        if (el.onclick) el.onclick.call(el);
+                    }} catch (e3) {{}}
+                }}
+
+                return {{
+                    success: true,
+                    selector: '{selector}',
+                    strategy: strategy,
+                    message: 'Clicked element using strategy: ' + strategy,
+                    cursorAnimated: showCursor,
+                    cursorVisible: window.__aiCursor__ && window.__aiCursor__.style.display !== 'none',
+                    elementInfo: {{
+                        tagName: el.tagName,
+                        id: el.id,
+                        className: el.className,
+                        text: el.textContent.trim().substring(0, 100),
+                        position: {{
+                            top: rect.top,
+                            left: rect.left,
+                            width: rect.width,
+                            height: rect.height,
+                            clickX: clickX,
+                            clickY: clickY
+                        }},
+                        inViewport: inViewport
+                    }}
+                }};
             }})()
             """
 
             # Use AsyncCDP wrapper for thread-safe evaluation (STABILITY FIX)
             result = await self.context.cdp.evaluate(expression=js_code, returnByValue=True, awaitPromise=True)
-            click_result = result.get('result', {}).get('value', {})
+            click_result = result.get('result', {}).get('value')
+
+            # Handle None or missing value
+            if not click_result or not isinstance(click_result, dict):
+                logger.error(f"✗ Invalid click result: {result}")
+                return {
+                    "success": False,
+                    "reason": "invalid_result",
+                    "message": f"Click returned invalid result for selector: {selector}",
+                    "raw_result": str(result)
+                }
 
             # Log result for debugging
             if click_result.get('success'):
@@ -274,7 +273,7 @@ Tip: Use save_page_info() first to see available elements and verify click worke
                 ])
 
             js_code = f"""
-            (function() {{
+            (async function() {{
                 const tags = {tags_js};
                 const selector = tags.join(', ');
                 const elements = Array.from(document.querySelectorAll(selector));
@@ -427,90 +426,91 @@ Tip: Use save_page_info() first to see available elements and verify click worke
                     rect: {{ left: rect.left, top: rect.top, width: rect.width, height: rect.height }}
                 }});
 
-                // Animate cursor
+                // Animate cursor and wait for completion
                 if (window.__moveAICursor__) {{
-                    window.__moveAICursor__(clickX, clickY, 400);
+                    window.__moveAICursor__(clickX, clickY, 1000);
+                    await new Promise(r => setTimeout(r, 1000)); // Wait for cursor animation
                 }}
 
-                return new Promise((resolve) => {{
-                    setTimeout(() => {{
-                        try {{
-                            if (window.__clickAICursor__) {{
-                                window.__clickAICursor__();
-                            }}
+                // Show click animation and wait
+                if (window.__clickAICursor__) {{
+                    window.__clickAICursor__();
+                    await new Promise(r => setTimeout(r, 1000)); // Wait for click flash
+                }}
 
-                            // Try multiple click methods
-                            let clicked = false;
+                // Now perform the actual click
+                let clicked = false;
 
-                            // Method 1: Direct click
-                            try {{
-                                el.click();
-                                clicked = true;
-                            }} catch (e1) {{
-                                console.warn('[MCP] Direct click failed:', e1);
-                            }}
+                // Method 1: Direct click
+                try {{
+                    el.click();
+                    clicked = true;
+                }} catch (e1) {{
+                    console.warn('[MCP] Direct click failed:', e1);
+                }}
 
-                            // Method 2: Dispatch mouse events
-                            try {{
-                                ['mousedown', 'mouseup', 'click'].forEach(eventType => {{
-                                    const event = new MouseEvent(eventType, {{
-                                        view: window,
-                                        bubbles: true,
-                                        cancelable: true,
-                                        clientX: clickX,
-                                        clientY: clickY
-                                    }});
-                                    el.dispatchEvent(event);
-                                }});
-                                clicked = true;
-                            }} catch (e2) {{
-                                console.warn('[MCP] Mouse events failed:', e2);
-                            }}
+                // Method 2: Dispatch mouse events
+                try {{
+                    ['mousedown', 'mouseup', 'click'].forEach(eventType => {{
+                        const event = new MouseEvent(eventType, {{
+                            view: window,
+                            bubbles: true,
+                            cancelable: true,
+                            clientX: clickX,
+                            clientY: clickY
+                        }});
+                        el.dispatchEvent(event);
+                    }});
+                    clicked = true;
+                }} catch (e2) {{
+                    console.warn('[MCP] Mouse events failed:', e2);
+                }}
 
-                            // Method 3: Focus and trigger onclick
-                            if (el.tagName === 'BUTTON' || el.tagName === 'A' || el.tagName === 'INPUT') {{
-                                try {{
-                                    el.focus();
-                                    if (el.onclick) {{
-                                        el.onclick.call(el);
-                                        clicked = true;
-                                    }}
-                                }} catch (e3) {{
-                                    console.warn('[MCP] Focus/onclick failed:', e3);
-                                }}
-                            }}
-
-                            resolve({{
-                                success: clicked,
-                                searchText: searchText,
-                                matchScore: bestScore,
-                                message: clicked ? `Clicked element with text: "${{searchText}}"` : 'All click methods failed',
-                                cursorVisible: window.__aiCursor__ && window.__aiCursor__.style.display !== 'none',
-                                element: {{
-                                    tag: el.tagName,
-                                    id: el.id,
-                                    className: el.className,
-                                    actualText: el.textContent.trim().substring(0, 100),
-                                    ariaLabel: el.getAttribute('aria-label'),
-                                    role: el.getAttribute('role'),
-                                    position: {{ x: clickX, y: clickY }}
-                                }}
-                            }});
-                        }} catch (e) {{
-                            resolve({{
-                                success: false,
-                                message: 'Click failed: ' + e.message,
-                                error: e.toString()
-                            }});
+                // Method 3: Focus and trigger onclick
+                if (el.tagName === 'BUTTON' || el.tagName === 'A' || el.tagName === 'INPUT') {{
+                    try {{
+                        el.focus();
+                        if (el.onclick) {{
+                            el.onclick.call(el);
+                            clicked = true;
                         }}
-                    }}, 450);
-                }});
+                    }} catch (e3) {{
+                        console.warn('[MCP] Focus/onclick failed:', e3);
+                    }}
+                }}
+
+                return {{
+                    success: clicked,
+                    searchText: searchText,
+                    matchScore: bestScore,
+                    message: clicked ? `Clicked element with text: "${{searchText}}"` : 'All click methods failed',
+                    cursorVisible: window.__aiCursor__ && window.__aiCursor__.style.display !== 'none',
+                    element: {{
+                        tag: el.tagName,
+                        id: el.id,
+                        className: el.className,
+                        actualText: el.textContent.trim().substring(0, 100),
+                        ariaLabel: el.getAttribute('aria-label'),
+                        role: el.getAttribute('role'),
+                        position: {{ x: clickX, y: clickY }}
+                    }}
+                }};
             }})()
             """
 
             # Use AsyncCDP wrapper for thread-safe evaluation (STABILITY FIX)
             result = await self.context.cdp.evaluate(expression=js_code, returnByValue=True, awaitPromise=True)
-            click_result = result.get('result', {}).get('value', {})
+            click_result = result.get('result', {}).get('value')
+
+            # Handle None or missing value
+            if not click_result or not isinstance(click_result, dict):
+                logger.error(f"✗ Invalid click_by_text result: {result}")
+                return {
+                    "success": False,
+                    "reason": "invalid_result",
+                    "message": f"Click by text returned invalid result for: {text}",
+                    "raw_result": str(result)
+                }
 
             # Log result to stderr for debugging
             if click_result.get('success'):
