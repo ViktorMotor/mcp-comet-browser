@@ -15,11 +15,21 @@ class ClickCommand(Command):
     """Click on an element with multiple search strategies"""
 
     name = "click"
-    description = "Click on an element matching a CSS selector. Supports XPath (//), text search, and ARIA attributes. Auto-scrolls to element and shows cursor animation."
+    description = """Click on an element. Supports multiple strategies including smart UI patterns.
+
+Strategies:
+- CSS selectors: 'button.submit'
+- XPath: '//button[@type="submit"]'
+- Text search: contains text
+- SMART PATTERNS:
+  - 'close' or '[close]' - Finds close buttons (SVG icons, top-right position, no text)
+  - Scores candidates by: class names, position, size, SVG presence
+
+Auto-scrolls to element and shows cursor animation."""
     input_schema = {
         "type": "object",
         "properties": {
-            "selector": {"type": "string", "description": "CSS selector, XPath (//button), or text content"}
+            "selector": {"type": "string", "description": "CSS selector, XPath, text, or smart pattern like 'close'"}
         },
         "required": ["selector"]
     }
@@ -46,9 +56,78 @@ class ClickCommand(Command):
                 let el = null;
                 let strategy = '';
 
+                // SMART PATTERN: Close button detection
+                if ('{selector}'.toLowerCase().includes('close') ||
+                    '{selector}' === '[close]' ||
+                    '{selector}' === 'close-button') {{
+
+                    // Find typical close buttons (SVG icons, top-right position)
+                    const candidates = Array.from(document.querySelectorAll(
+                        'button, [role="button"], [aria-label*="close" i], [aria-label*="dismiss" i], ' +
+                        '.close, .dismiss, .modal-close, [class*="close"], [class*="dismiss"]'
+                    ));
+
+                    // Score each candidate
+                    let bestScore = 0;
+                    let bestCandidate = null;
+
+                    for (const btn of candidates) {{
+                        let score = 0;
+                        const rect = btn.getBoundingClientRect();
+                        const parent = btn.closest('dialog, [role="dialog"], .modal, .popup, [class*="modal"], [class*="dialog"]');
+
+                        // Check if visible
+                        if (rect.width === 0 || rect.height === 0) continue;
+
+                        // +50: Has close-related class
+                        if (btn.classList.contains('close') ||
+                            btn.classList.contains('dismiss') ||
+                            Array.from(btn.classList).some(c => c.includes('close') || c.includes('dismiss'))) {{
+                            score += 50;
+                        }}
+
+                        // +30: Contains SVG (typical for icon-only buttons)
+                        if (btn.querySelector('svg')) {{
+                            score += 30;
+                        }}
+
+                        // +40: In top-right corner of parent
+                        if (parent) {{
+                            const parentRect = parent.getBoundingClientRect();
+                            const isTopRight = rect.right > (parentRect.right - 100) &&
+                                              rect.top < (parentRect.top + 100);
+                            if (isTopRight) score += 40;
+                        }}
+
+                        // +20: Small size (typical for close icons)
+                        if (rect.width < 50 && rect.height < 50) {{
+                            score += 20;
+                        }}
+
+                        // +30: Has aria-label with close/dismiss
+                        const ariaLabel = btn.getAttribute('aria-label') || '';
+                        if (ariaLabel.toLowerCase().includes('close') ||
+                            ariaLabel.toLowerCase().includes('dismiss')) {{
+                            score += 30;
+                        }}
+
+                        if (score > bestScore) {{
+                            bestScore = score;
+                            bestCandidate = btn;
+                        }}
+                    }}
+
+                    if (bestCandidate) {{
+                        el = bestCandidate;
+                        strategy = 'smart-close-button (score: ' + bestScore + ')';
+                    }}
+                }}
+
                 // Strategy 1: Direct CSS selector
-                el = document.querySelector('{selector}');
-                if (el) strategy = 'css';
+                if (!el) {{
+                    el = document.querySelector('{selector}');
+                    if (el) strategy = 'css';
+                }}
 
                 // Strategy 2: XPath
                 if (!el && '{selector}'.startsWith('//')) {{

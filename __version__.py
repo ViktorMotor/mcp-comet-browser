@@ -1,11 +1,23 @@
 """Version information for MCP Comet Browser"""
 
-__version__ = "2.20.0"
-__version_info__ = (2, 20, 0)
+__version__ = "2.20.1"
+__version_info__ = (2, 20, 1)
 __release_date__ = "2025-10-22"
 
 # Version history
 VERSION_HISTORY = {
+    "2.20.1": {
+        "date": "2025-10-22",
+        "description": "⚡ Smart UI Pattern Detection - Close Buttons",
+        "changes": [
+            "ADDED: Smart close button detection in click command",
+            "NEW: Use click(selector='close') to find SVG icon close buttons",
+            "Intelligent scoring: class names, position (top-right), size, SVG presence",
+            "No aria-label/text required - finds visual patterns",
+            "Solves: Lucide X icons, modal close buttons without text"
+        ],
+        "user_reported": "Close button (SVG icon) has no text - click_by_text can't find it"
+    },
     "2.20.0": {
         "date": "2025-10-22",
         "description": "🎯 Critical Fix - Visual Clickability Detection",
