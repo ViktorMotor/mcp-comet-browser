@@ -485,7 +485,7 @@ Tip: Use save_page_info() first to see available elements and verify click worke
                     return {{
                         success: false,
                         message: `Element with text not found: "${{searchText}}"`,
-                        searchedTags: tags,
+                        searchedTags: semanticTags,
                         totalElements: elements.length,
                         visibleElements: visibleElements.length,
                         partialMatches: partialMatches.length,
