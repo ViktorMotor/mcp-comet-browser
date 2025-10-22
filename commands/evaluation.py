@@ -230,8 +230,8 @@ Examples:
         if result_type in ['object', 'array']:
             # Try to make objects more readable
             try:
-                # Limit depth for very nested objects
-                return self._limit_object_depth(result, max_depth=3)
+                # Limit depth for very nested objects (increased from 3 to 5)
+                return self._limit_object_depth(result, max_depth=5)
             except:
                 return str(result)
 
@@ -240,7 +240,15 @@ Examples:
     def _limit_object_depth(self, obj: Any, max_depth: int, current_depth: int = 0) -> Any:
         """Limit object nesting depth to prevent huge outputs"""
         if current_depth >= max_depth:
-            return "[Object - max depth reached]"
+            # More informative message with object info
+            if isinstance(obj, dict):
+                keys_count = len(obj)
+                return f"{{...{keys_count} keys}} (max depth {max_depth} reached)"
+            elif isinstance(obj, list):
+                items_count = len(obj)
+                return f"[...{items_count} items] (max depth {max_depth} reached)"
+            else:
+                return f"<{type(obj).__name__}> (max depth reached)"
 
         if isinstance(obj, dict):
             return {

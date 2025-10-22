@@ -1,0 +1,1 @@
+{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"evaluate_js","arguments":{"code":"return {viewportWidth: window.innerWidth, viewportHeight: window.innerHeight}"}}}

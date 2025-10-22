@@ -51,13 +51,32 @@ Contains: buttons/links positions, DevTools console (last 10 logs), network requ
                     return (el.innerText || el.textContent || '').trim();
                 }
 
-                const interactive = Array.from(document.querySelectorAll('button, a, [role="button"], [role="tab"]'))
+                // CRITICAL FIX: Find ALL interactive elements (semantic + visually clickable)
+                let interactiveElements = [];
+
+                // 1. Semantic clickable elements
+                const semanticSelector = 'button, a, input[type="button"], input[type="submit"], [role="button"], [role="tab"], [role="link"], [onclick], .btn, .button, [tabindex]';
+                const semanticElements = Array.from(document.querySelectorAll(semanticSelector));
+                interactiveElements.push(...semanticElements);
+
+                // 2. Visually clickable elements (cursor: pointer) - like lead cards!
+                const potentialClickable = Array.from(document.querySelectorAll('div, span, li, section, article, header'));
+                for (const el of potentialClickable) {
+                    const style = window.getComputedStyle(el);
+                    if (style.cursor === 'pointer' || el.onclick !== null) {
+                        interactiveElements.push(el);
+                    }
+                }
+
+                // Remove duplicates and filter visible
+                const interactive = [...new Set(interactiveElements)]
                     .filter(el => {
                         const rect = el.getBoundingClientRect();
                         return rect.width > 0 && rect.height > 0 && el.offsetParent !== null;
                     })
                     .map(el => {
                         const rect = el.getBoundingClientRect();
+                        const style = window.getComputedStyle(el);
                         return {
                             tag: el.tagName.toLowerCase(),
                             text: getVisibleText(el).substring(0, 100),
@@ -66,7 +85,8 @@ Contains: buttons/links positions, DevTools console (last 10 logs), network requ
                             position: {
                                 x: Math.round(rect.left + rect.width/2),
                                 y: Math.round(rect.top + rect.height/2)
-                            }
+                            },
+                            clickable_reason: el.onclick || style.cursor === 'pointer' ? 'cursor-pointer' : 'semantic'
                         };
                     });
 

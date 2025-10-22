@@ -1,11 +1,25 @@
 """Version information for MCP Comet Browser"""
 
-__version__ = "2.19.0"
-__version_info__ = (2, 19, 0)
+__version__ = "2.20.0"
+__version_info__ = (2, 20, 0)
 __release_date__ = "2025-10-22"
 
 # Version history
 VERSION_HISTORY = {
+    "2.20.0": {
+        "date": "2025-10-22",
+        "description": "🎯 Critical Fix - Visual Clickability Detection",
+        "changes": [
+            "FIXED: click_by_text now finds elements with cursor:pointer (lead cards!)",
+            "FIXED: save_page_info includes visually clickable elements, not just semantic",
+            "FIXED: evaluate_js depth limit increased 3→5 for better object serialization",
+            "Added cursor:pointer detection in click_by_text",
+            "Added onclick handler detection",
+            "New field 'clickable_reason' in save_page_info output",
+            "Better depth limit messages: shows object/array size"
+        ],
+        "user_reported": "Lead cards not found by click_by_text - only semantic buttons visible"
+    },
     "2.19.0": {
         "date": "2025-10-22",
         "description": "🔧 Critical MCP Protocol Fix - Command Results Now Visible",

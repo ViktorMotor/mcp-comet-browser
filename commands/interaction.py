@@ -266,19 +266,38 @@ Tip: Use save_page_info() first to see available elements and verify click worke
             if tag:
                 tags_js = json.dumps([tag])
             else:
-                # Comprehensive list of clickable elements
+                # Start with semantic clickable elements
                 tags_js = json.dumps([
                     'button', 'a', 'input[type="button"]', 'input[type="submit"]',
                     '[role="button"]', '[role="tab"]', '[role="link"]', '[role="menuitem"]',
-                    '[onclick]', 'div[onclick]', 'span[onclick]', 'li[onclick]',
-                    'div[role]', 'span[role]', '.btn', '.button', '[tabindex]'
+                    '[onclick]', '.btn', '.button', '[tabindex]'
                 ])
 
             js_code = f"""
             (async function() {{
-                const tags = {tags_js};
-                const selector = tags.join(', ');
-                const elements = Array.from(document.querySelectorAll(selector));
+                let elements = [];
+
+                // 1. Get semantic clickable elements
+                const semanticTags = {tags_js};
+                const semanticSelector = semanticTags.join(', ');
+                const semanticElements = Array.from(document.querySelectorAll(semanticSelector));
+                elements.push(...semanticElements);
+
+                // 2. CRITICAL FIX: Find visually clickable elements (cursor: pointer)
+                // Check common container elements that might be clickable cards/divs
+                const potentialClickable = Array.from(document.querySelectorAll('div, span, li, section, article, header'));
+                for (const el of potentialClickable) {{
+                    const style = window.getComputedStyle(el);
+                    // Include if cursor is pointer OR has click handler
+                    if (style.cursor === 'pointer' ||
+                        el.onclick !== null ||
+                        el.hasAttribute('onclick')) {{
+                        elements.push(el);
+                    }}
+                }}
+
+                // Remove duplicates
+                elements = [...new Set(elements)];
                 const searchText = {text_escaped};
                 const exactMatch = {str(exact).lower()};
 
