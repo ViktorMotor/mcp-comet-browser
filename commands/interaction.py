@@ -521,16 +521,35 @@ Tip: Use save_page_info() first to see available elements and verify click worke
 
             # Use AsyncCDP wrapper for thread-safe evaluation (STABILITY FIX)
             result = await self.context.cdp.evaluate(expression=js_code, returnByValue=True, awaitPromise=True)
+
+            # Debug logging
+            logger.debug(f"click_by_text CDP result: {result}")
+
             click_result = result.get('result', {}).get('value')
 
             # Handle None or missing value
             if not click_result or not isinstance(click_result, dict):
-                logger.error(f"✗ Invalid click_by_text result: {result}")
+                logger.error(f"✗ Invalid click_by_text result for '{text}'")
+                logger.error(f"   Raw CDP result: {result}")
+                logger.error(f"   Extracted value: {click_result}")
+                logger.error(f"   Value type: {type(click_result)}")
+
+                # Check for exception in CDP result
+                if 'exceptionDetails' in result:
+                    exception = result['exceptionDetails']
+                    return {
+                        "success": False,
+                        "reason": "javascript_error",
+                        "message": f"JavaScript error while clicking '{text}': {exception.get('text', 'Unknown error')}",
+                        "exception": str(exception)
+                    }
+
                 return {
                     "success": False,
                     "reason": "invalid_result",
                     "message": f"Click by text returned invalid result for: {text}",
-                    "raw_result": str(result)
+                    "raw_result": str(result),
+                    "debug_info": f"result.keys={list(result.keys())}, value={click_result}, type={type(click_result).__name__}"
                 }
 
             # Log result to stderr for debugging
