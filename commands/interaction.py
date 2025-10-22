@@ -212,14 +212,14 @@ Auto-scrolls to element and shows cursor animation."""
                 // Animate cursor and wait for completion
                 const showCursor = {str(show_cursor).lower()};
                 if (showCursor && window.__moveAICursor__) {{
-                    window.__moveAICursor__(clickX, clickY, 1000);
-                    await new Promise(r => setTimeout(r, 1000)); // Wait for cursor animation
+                    window.__moveAICursor__(clickX, clickY, 400);
+                    await new Promise(r => setTimeout(r, 400)); // Wait for cursor animation
                 }}
 
                 // Show click animation and wait
                 if (showCursor && window.__clickAICursor__) {{
                     window.__clickAICursor__();
-                    await new Promise(r => setTimeout(r, 1000)); // Wait for click flash
+                    await new Promise(r => setTimeout(r, 400)); // Wait for click flash
                 }}
 
                 // Multiple click methods
@@ -528,14 +528,14 @@ Tip: Use save_page_info() first to see available elements and verify click worke
 
                 // Animate cursor and wait for completion
                 if (window.__moveAICursor__) {{
-                    window.__moveAICursor__(clickX, clickY, 1000);
-                    await new Promise(r => setTimeout(r, 1000)); // Wait for cursor animation
+                    window.__moveAICursor__(clickX, clickY, 400);
+                    await new Promise(r => setTimeout(r, 400)); // Wait for cursor animation
                 }}
 
                 // Show click animation and wait
                 if (window.__clickAICursor__) {{
                     window.__clickAICursor__();
-                    await new Promise(r => setTimeout(r, 1000)); // Wait for click flash
+                    await new Promise(r => setTimeout(r, 400)); // Wait for click flash
                 }}
 
                 // Now perform the actual click
