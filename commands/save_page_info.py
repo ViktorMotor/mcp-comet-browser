@@ -5,6 +5,9 @@ from typing import Dict, Any
 from .base import Command
 from .registry import register
 from utils.json_optimizer import JsonOptimizer
+from mcp.logging_config import get_logger
+
+logger = get_logger("commands.save_page_info")
 
 
 @register
@@ -33,8 +36,11 @@ Contains: buttons/links positions, DevTools console (last 10 logs), network requ
         }
     }
 
+    requires_cdp = True  # Uses AsyncCDP wrapper for thread-safe evaluation
+
     async def execute(self, output_file: str = "./page_info.json", full: bool = False) -> Dict[str, Any]:
         """Save page info to file (optimized by default, use full=True for debugging)"""
+        logger.info(f"save_page_info: file={output_file}, full={full}")
         try:
             js_code = """
             (function() {
@@ -117,6 +123,10 @@ Contains: buttons/links positions, DevTools console (last 10 logs), network requ
             file_size = os.path.getsize(output_file)
             size_kb = round(file_size / 1024, 1)
 
+            logger.info(f"✓ Page info saved: {output_file} ({size_kb}KB, {'full' if full else 'optimized'})")
+            logger.debug(f"  Elements: {len(page_info.get('interactive_elements', []))}, "
+                        f"Console logs: {page_info.get('console', {}).get('total', 0)}")
+
             return {
                 "success": True,
                 "message": f"Page info saved to {output_file} ({size_kb}KB, {'full' if full else 'optimized'} mode)",
@@ -127,6 +137,7 @@ Contains: buttons/links positions, DevTools console (last 10 logs), network requ
             }
 
         except Exception as e:
+            logger.error(f"✗ Failed to save page info: {str(e)}")
             return {
                 "success": False,
                 "message": f"Failed to save page info: {str(e)}",

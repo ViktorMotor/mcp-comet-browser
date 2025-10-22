@@ -2,6 +2,9 @@
 from typing import Dict, Any
 from .base import Command
 from .registry import register
+from mcp.logging_config import get_logger
+
+logger = get_logger("commands.diagnostics")
 
 
 @register
@@ -37,6 +40,8 @@ class DiagnosePageCommand(Command):
         "type": "object",
         "properties": {}
     }
+
+    requires_cdp = True  # Uses AsyncCDP wrapper for thread-safe evaluation
 
     async def execute(self) -> Dict[str, Any]:
         """Run diagnostic checks"""
@@ -104,6 +109,8 @@ class GetClickableElementsCommand(Command):
             "visible_only": {"type": "boolean", "description": "Only visible elements", "default": True}
         }
     }
+
+    requires_cdp = True  # Uses AsyncCDP wrapper for thread-safe evaluation
 
     async def execute(self, text_filter: str = None, visible_only: bool = True) -> Dict[str, Any]:
         """Get all clickable elements"""

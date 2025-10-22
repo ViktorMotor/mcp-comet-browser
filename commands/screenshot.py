@@ -4,8 +4,11 @@ import os
 from typing import Dict, Any, Optional
 from .base import Command
 from .registry import register
+from mcp.logging_config import get_logger
 from mcp.errors import InvalidArgumentError
 from utils.validators import Validators
+
+logger = get_logger("commands.screenshot")
 
 try:
     from PIL import Image
@@ -75,6 +78,8 @@ Note: Requires Pillow for JPEG/resize support. Install: pip install Pillow"""
         }
     }
 
+    requires_cdp = True  # Uses AsyncCDP wrapper for thread-safe evaluation
+
     async def execute(
         self,
         path: str = "./screenshots/screenshot.png",
@@ -85,6 +90,9 @@ Note: Requires Pillow for JPEG/resize support. Install: pip install Pillow"""
         full_page: bool = False
     ) -> Dict[str, Any]:
         """Capture and save screenshot with optimization"""
+        logger.info(f"screenshot: path={path}, format={format}, quality={quality}, "
+                   f"max_width={max_width}, element={element}, full_page={full_page}")
+
         # Validate inputs BEFORE try block (so exceptions propagate)
         # Validate path (security check)
         path = Validators.validate_path(path, allowed_prefixes=['./screenshots/'])
@@ -157,6 +165,9 @@ Note: Requires Pillow for JPEG/resize support. Install: pip install Pillow"""
                 message += f", {reduction_pct}% reduction"
             message += ")"
 
+            logger.info(f"✓ Screenshot captured: {path} ({size_kb}KB, {format}, "
+                       f"{'optimized' if reduction_pct > 0 else 'original'})")
+
             return {
                 "success": True,
                 "path": path,
@@ -167,6 +178,7 @@ Note: Requires Pillow for JPEG/resize support. Install: pip install Pillow"""
             }
 
         except Exception as e:
+            logger.error(f"✗ Screenshot failed: {str(e)}")
             return {
                 "success": False,
                 "error": str(e),

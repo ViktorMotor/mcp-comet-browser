@@ -25,6 +25,7 @@ class ClickCommand(Command):
     }
 
     requires_cursor = True
+    requires_cdp = True  # Uses AsyncCDP wrapper for thread-safe evaluation
 
     async def execute(self, selector: str, show_cursor: bool = True, **kwargs) -> Dict[str, Any]:
         """Execute click with multiple strategies and cursor animation"""
@@ -243,6 +244,7 @@ Tip: Use save_page_info() first to see available elements and verify click worke
     }
 
     requires_cursor = True
+    requires_cdp = True  # Uses AsyncCDP wrapper for thread-safe evaluation
 
     async def execute(self, text: str, tag: Optional[str] = None, exact: bool = False, **kwargs) -> Dict[str, Any]:
         """Execute click by text with cursor animation"""
@@ -546,6 +548,8 @@ class ScrollPageCommand(Command):
         }
     }
 
+    requires_cdp = True  # Uses AsyncCDP wrapper for thread-safe evaluation
+
     async def execute(self, direction: str = "down", amount: Optional[int] = None,
                      x: Optional[int] = None, y: Optional[int] = None,
                      selector: Optional[str] = None) -> Dict[str, Any]:
@@ -676,6 +680,7 @@ class MoveCursorCommand(Command):
     }
 
     requires_cursor = True
+    requires_cdp = True  # Uses AsyncCDP wrapper for thread-safe evaluation
 
     async def execute(self, x: Optional[int] = None, y: Optional[int] = None,
                      selector: Optional[str] = None, duration: int = 400, **kwargs) -> Dict[str, Any]:

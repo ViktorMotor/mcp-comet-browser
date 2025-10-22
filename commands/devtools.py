@@ -2,6 +2,9 @@
 from typing import Dict, Any, Optional
 from .base import Command
 from .registry import register
+from mcp.logging_config import get_logger
+
+logger = get_logger("commands.devtools")
 
 
 @register
@@ -14,6 +17,8 @@ class OpenDevtoolsCommand(Command):
         "type": "object",
         "properties": {}
     }
+
+    requires_cdp = True  # Uses AsyncCDP wrapper for thread-safe evaluation
 
     async def execute(self) -> Dict[str, Any]:
         """Send F12 keyboard event"""
@@ -56,6 +61,8 @@ class CloseDevtoolsCommand(Command):
         "properties": {}
     }
 
+    requires_cdp = True  # Uses AsyncCDP wrapper for thread-safe evaluation
+
     async def execute(self) -> Dict[str, Any]:
         """Send F12 keyboard event to toggle close"""
         try:
@@ -92,6 +99,8 @@ class ConsoleCommandCommand(Command):
         },
         "required": ["command"]
     }
+
+    requires_cdp = True  # Uses AsyncCDP wrapper for thread-safe evaluation
 
     async def execute(self, command: str) -> Dict[str, Any]:
         """Execute command in console context"""
@@ -296,6 +305,8 @@ class InspectElementCommand(Command):
         },
         "required": ["selector"]
     }
+
+    requires_cdp = True  # Uses AsyncCDP wrapper for thread-safe evaluation
 
     async def execute(self, selector: str) -> Dict[str, Any]:
         """Inspect element properties, styles, and position"""

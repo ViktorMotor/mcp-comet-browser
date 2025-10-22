@@ -2,6 +2,9 @@
 from typing import Dict, Any
 from .base import Command
 from .registry import register
+from mcp.logging_config import get_logger
+
+logger = get_logger("commands.helpers")
 
 
 @register
@@ -17,6 +20,8 @@ class DebugElementCommand(Command):
             "selector": {"type": "string", "description": "CSS selector (optional)"}
         }
     }
+
+    requires_cdp = True  # Uses AsyncCDP wrapper for thread-safe evaluation
 
     async def execute(self, text: str = None, selector: str = None) -> Dict[str, Any]:
         """Debug element and return all possible selectors and click methods"""
@@ -140,6 +145,7 @@ class ForceClickCommand(Command):
     }
 
     requires_cursor = True
+    requires_cdp = True  # Uses AsyncCDP wrapper for thread-safe evaluation
 
     async def execute(self, x: int = None, y: int = None, text: str = None, **kwargs) -> Dict[str, Any]:
         """Force click at coordinates or on text"""

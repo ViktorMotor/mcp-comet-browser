@@ -4,6 +4,7 @@ from typing import Dict, Any
 from urllib.parse import urlparse
 from .base import Command
 from .registry import register
+from mcp.logging_config import get_logger
 from mcp.errors import (
     CommandError,
     CommandTimeoutError,
@@ -11,6 +12,8 @@ from mcp.errors import (
     InvalidArgumentError,
     CDPError
 )
+
+logger = get_logger("commands.navigation")
 
 
 @register
@@ -32,9 +35,12 @@ class OpenUrlCommand(Command):
 
     async def execute(self, url: str, **kwargs) -> Dict[str, Any]:
         """Navigate to URL and reinitialize cursor"""
+        logger.info(f"open_url: navigating to {url}")
+
         # Validate URL
         parsed = urlparse(url)
         if not parsed.scheme:
+            logger.error(f"✗ Invalid URL: {url} (missing scheme)")
             raise InvalidArgumentError(
                 argument="url",
                 expected="valid URL with scheme (http:// or https://)",
@@ -44,8 +50,10 @@ class OpenUrlCommand(Command):
         try:
             await self.cdp.navigate(url=url, timeout=30)
         except asyncio.TimeoutError:
+            logger.error(f"✗ Navigation timeout: {url} (30s)")
             raise CommandTimeoutError(command="open_url", timeout_seconds=30)
         except Exception as e:
+            logger.error(f"✗ Navigation failed: {url} - {str(e)}")
             raise CDPError(f"Failed to navigate to URL: {str(e)}")
 
         # Wait for page load
@@ -58,8 +66,9 @@ class OpenUrlCommand(Command):
                 await cursor.initialize()
             except Exception as e:
                 # Cursor init failure is not critical
-                pass
+                logger.debug(f"Cursor init failed after navigation: {e}")
 
+        logger.info(f"✓ Navigation complete: {url}")
         return {"success": True, "url": url, "message": f"Opened {url}"}
 
 
@@ -81,8 +90,11 @@ class GetTextCommand(Command):
 
     async def execute(self, selector: str) -> Dict[str, Any]:
         """Extract text content from selected element"""
+        logger.debug(f"get_text: selector='{selector}'")
+
         # Validate selector (basic check)
         if not selector or not selector.strip():
+            logger.error(f"✗ Invalid selector: empty")
             raise InvalidArgumentError(
                 argument="selector",
                 expected="non-empty CSS selector",
@@ -94,6 +106,7 @@ class GetTextCommand(Command):
             result = await self.cdp.query_selector(selector=selector)
 
             if not result.get('nodeId'):
+                logger.warning(f"✗ Element not found: '{selector}'")
                 raise ElementNotFoundError(selector=selector)
 
             # Use JS to get text content (escape selector properly)
@@ -107,8 +120,10 @@ class GetTextCommand(Command):
             eval_result = await self.cdp.evaluate(expression=js_code, returnByValue=True)
             text = eval_result.get('result', {}).get('value', '')
 
+            logger.info(f"✓ Text extracted from '{selector}': {text[:50]}{'...' if len(text) > 50 else ''}")
             return {"success": True, "text": text, "selector": selector}
         except ElementNotFoundError:
             raise
         except Exception as e:
+            logger.error(f"✗ Failed to get text from '{selector}': {str(e)}")
             raise CommandError(f"Failed to get text from '{selector}': {str(e)}")

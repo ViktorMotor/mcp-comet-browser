@@ -2,6 +2,9 @@
 from typing import Dict, Any
 from .base import Command
 from .registry import register
+from mcp.logging_config import get_logger
+
+logger = get_logger("commands.page_snapshot")
 
 
 @register

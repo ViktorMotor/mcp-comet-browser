@@ -1,11 +1,26 @@
 """Version information for MCP Comet Browser"""
 
-__version__ = "2.18.1"
-__version_info__ = (2, 18, 1)
-__release_date__ = "2025-10-16"
+__version__ = "2.19.0"
+__version_info__ = (2, 19, 0)
+__release_date__ = "2025-10-22"
 
 # Version history
 VERSION_HISTORY = {
+    "2.19.0": {
+        "date": "2025-10-22",
+        "description": "🔧 Critical MCP Protocol Fix - Command Results Now Visible",
+        "changes": [
+            "FIXED: Commands now return MCP-compliant format (content array)",
+            "FIXED: evaluate_js, console_command, inspect_element results now visible in Claude Code",
+            "Added _wrap_result_for_mcp() with smart formatting for all result types",
+            "Added requires_cdp=True to 14 commands using AsyncCDP",
+            "Smart output formatting: console_output, exceptions, file_paths, instructions",
+            "Backward-compatible: legacy format auto-converted to MCP format",
+            "All 29 tools now properly display results in Claude Code"
+        ],
+        "breaking_changes": [],
+        "migration": "No migration needed - all changes are backward-compatible"
+    },
     "2.18.1": {
         "date": "2025-10-16",
         "description": "Screenshot bugfix and AI optimization guide",

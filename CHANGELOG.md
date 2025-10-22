@@ -7,6 +7,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.19.0] - 2025-10-22
+
+### 🔧 Fixed - MCP Protocol Compliance (CRITICAL)
+
+**Problem:** Commands were not returning results in Claude Code
+- `evaluate_js`, `console_command`, `inspect_element` returned no visible output
+- Results executed successfully but were invisible to user
+- Claude Code couldn't display legacy format responses
+
+**Root Cause:**
+MCP Protocol requires specific response format:
+```json
+{
+  "content": [{"type": "text", "text": "..."}],
+  "isError": false
+}
+```
+
+But commands were returning legacy format:
+```python
+{"success": True, "result": ..., "message": "..."}
+```
+
+**Solution:**
+
+1. **Added MCP-wrapper in `mcp/protocol.py`:**
+   - New function `_wrap_result_for_mcp()` converts legacy → MCP format
+   - Smart formatting for different result types
+   - Handles: `console_output`, `exceptions`, `file_paths`, `instructions`
+   - Backward-compatible: auto-detects MCP format, passes through
+
+2. **Added `requires_cdp = True` to 14 commands:**
+   - `devtools.py` (4): open_devtools, close_devtools, console_command, inspect_element
+   - `save_page_info.py` (1): SavePageInfoCommand
+   - `screenshot.py` (1): ScreenshotCommand
+   - `interaction.py` (4): click, click_by_text, scroll_page, move_cursor
+   - `helpers.py` (2): debug_element, force_click
+   - `diagnostics.py` (2): diagnose_page, get_clickable_elements
+
+**Impact:**
+- ✅ All 29 tools now properly display results in Claude Code
+- ✅ No breaking changes - fully backward-compatible
+- ✅ Enhanced output formatting with emojis and structure
+
+**Example Output (evaluate_js):**
+```
+Executed successfully
+
+Result:
+"Page Title"
+
+Type: string
+
+📝 Console Output (2 messages):
+  [LOG] Test message
+  [WARN] Warning message
+```
+
+### Changed
+- Version bumped to 2.19.0
+- All command outputs now MCP-compliant
+- Improved result formatting for readability
+
+---
+
 ## [2.18.1] - 2025-10-16
 
 ### Fixed - Screenshot Command
