@@ -635,7 +635,7 @@ Animations optimized for human perception through real user testing:
 ### Documentation
 
 - Created `docs/roadmap-v2.md` - Complete refactoring plan
-- Updated `.claude/CLAUDE.md` with V2 architecture
+- Updated project documentation with V2 architecture
 - Backup branch: `backup-main-20251007`
 
 ### Files Modified
@@ -685,7 +685,6 @@ Animations optimized for human perception through real user testing:
 #### Documentation
 
 - Comprehensive `README.md` with setup instructions
-- `.claude/CLAUDE.md` - Complete AI context
 - `SOLUTION.md` - WSL2 portproxy alternative
 - `fix_comet_wsl.md` - All WSL setup methods
 

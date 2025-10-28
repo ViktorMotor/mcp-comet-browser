@@ -31,7 +31,7 @@ VERSION_HISTORY = {
             "click_by_text scoring algorithm changed (viewport awareness may select different elements)",
             "screenshot command marked as deprecated (use get_visual_snapshot for AI-friendly data)"
         ],
-        "migration": "Update version to 3.0.0. Check CLAUDE.md for detailed migration guide.",
+        "migration": "Update version to 3.0.0. Check CHANGELOG.md for detailed migration guide.",
         "performance_gains": {
             "click_by_text_speed": "800ms → 400ms (2x faster)",
             "element_search": "O(n²) → O(n) complexity",

@@ -222,8 +222,7 @@ python3 server.py
 ## 📚 Документация
 
 - **[README.md](README.md)** — полная инструкция по установке
-- **[CHANGELOG.md](CHANGELOG.md)** — история версий (V1.0 → V2.18)
-- **[.claude/CLAUDE.md](.claude/CLAUDE.md)** — детальная архитектура для Claude Code
+- **[CHANGELOG.md](CHANGELOG.md)** — история версий (V1.0 → V3.0)
 - **[SCREENSHOT_OPTIMIZATION.md](SCREENSHOT_OPTIMIZATION.md)** — гайд по оптимизации
 - **[docs/](docs/)** — примеры, troubleshooting, туториалы
 

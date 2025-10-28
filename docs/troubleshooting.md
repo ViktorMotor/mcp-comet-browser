@@ -90,14 +90,13 @@ curl http://localhost:9222/json/version
 
 ### Для пользователей WSL
 
-**Настройка WSL подключения полностью документирована в `.claude/CLAUDE.md`**
+**Настройка WSL подключения:**
 
-Кратко:
 1. Запустите `windows_proxy.py` на Windows (порт 9224)
 2. MCP-сервер автоматически определит IP Windows-хоста
 3. Monkey-patches в `browser/connection.py` обработают WebSocket URLs
 
-**Полная инструкция:** См. `.claude/CLAUDE.md` → "WSL2 Setup"
+**Полная инструкция:** См. README.md → раздел "Настройка для WSL"
 
 ### Для локального использования (не WSL)
 
@@ -205,12 +204,14 @@ git pull
 Покажи список всех доступных команд comet-browser
 ```
 
-Должно быть **29 команд** (полный список в `.claude/CLAUDE.md`):
+Должно быть **34 команды** (полный список в README.md):
 - Навигация: open_url, get_text
 - Взаимодействие: click, click_by_text, scroll_page, move_cursor
+- Form Automation: fill_input, select_option, check_checkbox, submit_form
 - DevTools: open_devtools, console_command, get_console_logs, inspect_element, get_network_activity, etc.
 - Вкладки: list_tabs, create_tab, close_tab, switch_tab
 - Диагностика: diagnose_page, debug_element, force_click, etc.
+- Visual: screenshot, get_visual_snapshot
 - И другие...
 
 ---
