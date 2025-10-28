@@ -39,4 +39,8 @@ js_result.json
 # Screenshots folder
 screenshots/
 
+# Coverage reports
+.coverage
+htmlcov/
+
 .claude
