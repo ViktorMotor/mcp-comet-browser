@@ -67,20 +67,59 @@ class AICursor:
                 window.__aiCursor__ = cursor;
                 window.__aiCursorInitialized = true;
 
+                // Animation state management (v3.0.0)
+                let currentAnimation = null;
+                let activeTimeouts = [];
+
                 // Helper functions
-                window.__moveAICursor__ = function(x, y, duration = 300) {
+                window.__moveAICursor__ = function(x, y, duration = 200) {
+                    // Cancel any ongoing animation to prevent visual glitches
+                    if (currentAnimation) {
+                        cancelAnimationFrame(currentAnimation);
+                        cursor.style.transition = 'none';  // Instant cancel
+                        // Force reflow to apply instant position
+                        void cursor.offsetWidth;
+                    }
+
                     cursor.style.display = 'block';
-                    cursor.style.left = (x - 12) + 'px';
-                    cursor.style.top = (y - 12) + 'px';
-                    cursor.style.transition = `all ${duration}ms cubic-bezier(0.4, 0, 0.2, 1)`;
+
+                    // Use requestAnimationFrame for smooth transition start
+                    currentAnimation = requestAnimationFrame(() => {
+                        cursor.style.transition = `all ${duration}ms cubic-bezier(0.4, 0, 0.2, 1)`;
+                        cursor.style.left = (x - 12) + 'px';
+                        cursor.style.top = (y - 12) + 'px';
+
+                        // Clear animation reference after completion
+                        const tid = setTimeout(() => {
+                            currentAnimation = null;
+                        }, duration);
+                        activeTimeouts.push(tid);
+                    });
                 };
 
                 window.__clickAICursor__ = function() {
                     cursor.classList.add('clicking');
-                    setTimeout(() => cursor.classList.remove('clicking'), 1000);
+                    const tid = setTimeout(() => {
+                        cursor.classList.remove('clicking');
+                        // Remove from active timeouts array
+                        activeTimeouts = activeTimeouts.filter(t => t !== tid);
+                    }, 400);  // Reduced from 1000ms to 400ms
+                    activeTimeouts.push(tid);
                 };
 
                 window.__hideAICursor__ = function() {
+                    cursor.style.display = 'none';
+                };
+
+                window.__cleanupAICursor__ = function() {
+                    // Cancel ongoing animations
+                    if (currentAnimation) {
+                        cancelAnimationFrame(currentAnimation);
+                        currentAnimation = null;
+                    }
+                    // Clear all pending timeouts to prevent memory leaks
+                    activeTimeouts.forEach(clearTimeout);
+                    activeTimeouts = [];
                     cursor.style.display = 'none';
                 };
 
@@ -94,8 +133,8 @@ class AICursor:
             logger.error(f"Failed to initialize AI cursor: {e}", exc_info=True)
             return {"success": False, "error": str(e)}
 
-    async def move(self, x: int, y: int, duration: int = 400) -> Dict[str, Any]:
-        """Move cursor to coordinates"""
+    async def move(self, x: int, y: int, duration: int = 200) -> Dict[str, Any]:
+        """Move cursor to coordinates (v3.0.0: default duration reduced to 200ms)"""
         if not self._initialized:
             await self.initialize()
 
@@ -123,6 +162,23 @@ class AICursor:
                 if (window.__clickAICursor__) {
                     window.__clickAICursor__();
                     return {success: true};
+                }
+                return {success: false, message: 'AI cursor not initialized'};
+            })()
+            """
+            result = self.tab.Runtime.evaluate(expression=js_code, returnByValue=True)
+            return result.get('result', {}).get('value', {})
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    async def cleanup(self) -> Dict[str, Any]:
+        """Cleanup cursor animations and timeouts to prevent memory leaks (v3.0.0)"""
+        try:
+            js_code = """
+            (function() {
+                if (window.__cleanupAICursor__) {
+                    window.__cleanupAICursor__();
+                    return {success: true, message: 'Cursor cleaned up'};
                 }
                 return {success: false, message: 'AI cursor not initialized'};
             })()

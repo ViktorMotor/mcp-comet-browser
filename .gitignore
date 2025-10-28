@@ -34,6 +34,9 @@ test_*.py
 
 # Generated files (MCP outputs)
 page_info.json
+js_result.json
 
 # Screenshots folder
 screenshots/
+
+.claude

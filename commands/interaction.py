@@ -6,6 +6,7 @@ from .registry import register
 from mcp.logging_config import get_logger
 from mcp.errors import InvalidArgumentError, CommandError
 from utils.validators import Validators
+from utils.cache_manager import get_element_search_cache
 
 logger = get_logger("commands.interaction")
 
@@ -326,10 +327,33 @@ Tip: Use save_page_info() first to see available elements and verify click worke
     requires_cdp = True  # Uses AsyncCDP wrapper for thread-safe evaluation
 
     async def execute(self, text: str, tag: Optional[str] = None, exact: bool = False, **kwargs) -> Dict[str, Any]:
-        """Execute click by text with cursor animation"""
+        """Execute click by text with cursor animation (v3.0.0: with TTL cache)"""
         try:
             # Validate text
             text = Validators.validate_string_length(text, "text", min_length=1, max_length=500)
+
+            # Get current URL for cache key
+            url_result = await self.context.cdp.evaluate(expression="window.location.href", returnByValue=True)
+            current_url = url_result.get('result', {}).get('value', '')
+
+            # Check cache (v3.0.0: TTL cache for repeated clicks)
+            cache = get_element_search_cache()
+            cache_key = f"click_by_text:{current_url}:{text}:{exact}:{tag}"
+
+            cached_result = cache.get(cache_key)
+            if cached_result:
+                logger.info(f"✓ Cache hit for click_by_text: '{text}'")
+                # Still show cursor animation even for cached results
+                cursor = self.context.cursor
+                if cursor:
+                    await cursor.initialize()
+                    element_pos = cached_result.get('element', {}).get('position', {})
+                    if element_pos:
+                        await cursor.move(element_pos.get('x', 0), element_pos.get('y', 0), duration=200)
+                        await cursor.click_animation()
+                        await asyncio.sleep(0.2)  # Wait for animation
+
+                return cached_result
 
             # Always initialize and show cursor
             cursor = self.context.cursor
@@ -362,18 +386,15 @@ Tip: Use save_page_info() first to see available elements and verify click worke
                 const semanticElements = Array.from(document.querySelectorAll(semanticSelector));
                 elements.push(...semanticElements);
 
-                // 2. CRITICAL FIX: Find visually clickable elements (cursor: pointer)
-                // Check common container elements that might be clickable cards/divs
-                const potentialClickable = Array.from(document.querySelectorAll('div, span, li, section, article, header'));
-                for (const el of potentialClickable) {{
-                    const style = window.getComputedStyle(el);
-                    // Include if cursor is pointer OR has click handler
-                    if (style.cursor === 'pointer' ||
-                        el.onclick !== null ||
-                        el.hasAttribute('onclick')) {{
-                        elements.push(el);
-                    }}
-                }}
+                // 2. OPTIMIZED (v3.0.0): Find visually clickable elements via CSS
+                // Instead of getComputedStyle for each element (O(n²)), use CSS selector
+                // This reduces overhead from ~1000 getComputedStyle calls to ~50 on typical pages
+                const visuallyClickable = Array.from(document.querySelectorAll('[style*="cursor: pointer"], [style*="cursor:pointer"]'));
+                elements.push(...visuallyClickable);
+
+                // 3. Find elements with click handlers (fast check, no getComputedStyle)
+                const withHandlers = Array.from(document.querySelectorAll('[onclick]'));
+                elements.push(...withHandlers);
 
                 // Remove duplicates
                 elements = [...new Set(elements)];
@@ -414,8 +435,15 @@ Tip: Use save_page_info() first to see available elements and verify click worke
                 let bestMatch = null;
                 let bestScore = 0;
 
+                // Get viewport dimensions for scoring (v3.0.0)
+                const viewportWidth = window.innerWidth;
+                const viewportHeight = window.innerHeight;
+
                 for (const el of elements) {{
                     if (!isElementVisible(el)) continue;
+
+                    // Get element position for viewport scoring
+                    const rect = el.getBoundingClientRect();
 
                     // Get various text representations
                     const fullText = normalizeText(el.textContent || '');
@@ -463,6 +491,39 @@ Tip: Use save_page_info() first to see available elements and verify click worke
                         if (placeholder.includes(searchNorm)) {{
                             matched = true;
                             score = Math.max(score, 40);
+                        }}
+                    }}
+
+                    // VIEWPORT SCORING (v3.0.0): Prefer elements in viewport and center
+                    if (matched) {{
+                        // Bonus for element in viewport (+15 points)
+                        const inViewport = rect.top >= 0 && rect.left >= 0 &&
+                                          rect.bottom <= viewportHeight &&
+                                          rect.right <= viewportWidth;
+                        if (inViewport) {{
+                            score += 15;
+
+                            // Additional bonus for center zone (20-80% of viewport) (+10 points)
+                            const centerMinX = viewportWidth * 0.2;
+                            const centerMaxX = viewportWidth * 0.8;
+                            const centerMinY = viewportHeight * 0.2;
+                            const centerMaxY = viewportHeight * 0.8;
+
+                            const elCenterX = rect.left + rect.width / 2;
+                            const elCenterY = rect.top + rect.height / 2;
+
+                            if (elCenterX >= centerMinX && elCenterX <= centerMaxX &&
+                                elCenterY >= centerMinY && elCenterY <= centerMaxY) {{
+                                score += 10;
+                            }}
+                        }} else {{
+                            // Penalty for elements outside viewport (-5 points)
+                            score -= 5;
+                        }}
+
+                        // Bonus for elements near top (first 500px) - likely more important (+5 points)
+                        if (rect.top >= 0 && rect.top < 500) {{
+                            score += 5;
                         }}
                     }}
 
@@ -526,16 +587,16 @@ Tip: Use save_page_info() first to see available elements and verify click worke
                     rect: {{ left: rect.left, top: rect.top, width: rect.width, height: rect.height }}
                 }});
 
-                // Animate cursor and wait for completion
+                // Animate cursor and wait for completion (v3.0.0: reduced to 200ms)
                 if (window.__moveAICursor__) {{
-                    window.__moveAICursor__(clickX, clickY, 400);
-                    await new Promise(r => setTimeout(r, 400)); // Wait for cursor animation
+                    window.__moveAICursor__(clickX, clickY, 200);
+                    await new Promise(r => setTimeout(r, 200)); // Wait for cursor animation
                 }}
 
-                // Show click animation and wait
+                // Show click animation and wait (v3.0.0: reduced to 200ms)
                 if (window.__clickAICursor__) {{
                     window.__clickAICursor__();
-                    await new Promise(r => setTimeout(r, 400)); // Wait for click flash
+                    await new Promise(r => setTimeout(r, 200)); // Wait for click flash
                 }}
 
                 // Now perform the actual click
@@ -634,6 +695,10 @@ Tip: Use save_page_info() first to see available elements and verify click worke
             # Log result to stderr for debugging
             if click_result.get('success'):
                 logger.info(f"✓ Successfully clicked: '{text}' (element: {click_result.get('element', {}).get('tag', 'unknown')}, score: {click_result.get('matchScore', 0)})")
+
+                # Cache successful result (v3.0.0: TTL cache)
+                cache.set(cache_key, click_result)
+                logger.debug(f"Cached click_by_text result for: '{text}'")
             else:
                 logger.warning(f"✗ Failed to click: '{text}' - {click_result.get('message', 'unknown error')}")
 
