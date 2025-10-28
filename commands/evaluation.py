@@ -120,28 +120,36 @@ Examples:
         escaped_code = user_code.replace('\\', '\\\\').replace('`', '\\`').replace('${', '\\${')
 
         return f"""
-        (function() {{
+        (async function() {{
             const capturedConsole = [];
 
             // Console capture
             {self._get_console_capture() if capture_console else ''}
 
-            // Execute user code
+            // Execute user code (v3.0.0: with async/await support)
             let result;
             let resultType = 'undefined';
 
             try {{
-                // Try as expression first (most common case)
+                // Try as async expression first (supports await)
                 try {{
-                    result = eval(`{escaped_code}`);
+                    // Wrap in async function to support await
+                    const asyncUserFunction = new Function(`return (async function() {{ return {escaped_code} }})();`);
+                    result = await asyncUserFunction();
                 }} catch (e) {{
                     // If eval fails, try wrapping in parentheses (for object literals)
                     try {{
-                        result = eval(`({escaped_code})`);
+                        const asyncUserFunction = new Function(`return (async function() {{ return ({escaped_code}) }})();`);
+                        result = await asyncUserFunction();
                     }} catch (e2) {{
-                        // If still fails, try as function body with return
-                        const userFunction = new Function(`{escaped_code}`);
-                        result = userFunction();
+                        // If still fails, try as async function body (may have statements + return)
+                        try {{
+                            const asyncUserFunction = new Function(`return (async function() {{ {escaped_code} }})();`);
+                            result = await asyncUserFunction();
+                        }} catch (e3) {{
+                            // Last resort: try synchronous eval (for compatibility)
+                            result = eval(`{escaped_code}`);
+                        }}
                     }}
                 }}
 

@@ -4,6 +4,7 @@ Exception hierarchy for MCP Comet Browser.
 Provides typed exceptions with JSON-RPC error codes for better error handling.
 """
 
+import traceback
 from typing import Optional, Dict, Any
 
 
@@ -24,14 +25,32 @@ class MCPError(Exception):
         self.code = code
         self.data = data or {}
 
-    def to_jsonrpc_error(self) -> Dict[str, Any]:
-        """Convert to JSON-RPC error response"""
+    def to_jsonrpc_error(self, include_stack: bool = True) -> Dict[str, Any]:
+        """Convert to JSON-RPC error response (v3.0.0: with stack traces)
+
+        Args:
+            include_stack: Include stack trace in error data (default: True)
+
+        Returns:
+            JSON-RPC error dict
+        """
         error = {
             "code": self.code,
             "message": self.message
         }
-        if self.data:
-            error["data"] = self.data
+
+        # Merge data with stack trace (v3.0.0)
+        data = self.data.copy() if self.data else {}
+
+        if include_stack and self.__traceback__:
+            # Extract stack trace for debugging
+            tb_lines = traceback.format_tb(self.__traceback__)
+            data["traceback"] = tb_lines
+            data["traceback_summary"] = "".join(tb_lines[-3:])  # Last 3 frames
+
+        if data:
+            error["data"] = data
+
         return error
 
 

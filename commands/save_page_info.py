@@ -96,6 +96,79 @@ Contains: buttons/links positions, DevTools console (last 10 logs), network requ
                 // Get network info
                 const networkEntries = performance.getEntriesByType('resource') || [];
 
+                // FORM AUTOMATION SUPPORT (v3.0.0): Extract form structures
+                const forms = Array.from(document.querySelectorAll('form')).map(form => {
+                    const fields = Array.from(form.querySelectorAll('input, textarea, select')).map(field => {
+                        const label = form.querySelector(`label[for="${field.id}"]`) ||
+                                     field.closest('label') ||
+                                     field.previousElementSibling?.tagName === 'LABEL' ? field.previousElementSibling : null;
+
+                        return {
+                            name: field.name || field.id || null,
+                            type: field.type || field.tagName.toLowerCase(),
+                            placeholder: field.placeholder || null,
+                            value: field.value || null,
+                            required: field.required || false,
+                            disabled: field.disabled || false,
+                            label: label ? getVisibleText(label) : null,
+                            id: field.id || null,
+                            selector: field.id ? `#${field.id}` : field.name ? `[name="${field.name}"]` : null
+                        };
+                    });
+
+                    const submitBtn = form.querySelector('button[type="submit"], input[type="submit"]');
+
+                    return {
+                        id: form.id || null,
+                        action: form.action || null,
+                        method: form.method || 'GET',
+                        field_count: fields.length,
+                        fields: fields,
+                        submit_button: submitBtn ? {
+                            text: getVisibleText(submitBtn),
+                            type: submitBtn.type,
+                            id: submitBtn.id || null
+                        } : null
+                    };
+                });
+
+                // Extract all inputs (not just in forms)
+                const allInputs = Array.from(document.querySelectorAll('input, textarea')).map(input => {
+                    const label = document.querySelector(`label[for="${input.id}"]`) ||
+                                 input.closest('label') ||
+                                 input.previousElementSibling?.tagName === 'LABEL' ? input.previousElementSibling : null;
+
+                    return {
+                        name: input.name || input.id || null,
+                        type: input.type || 'text',
+                        placeholder: input.placeholder || null,
+                        value: input.value || null,
+                        required: input.required || false,
+                        label: label ? getVisibleText(label) : null,
+                        selector: input.id ? `#${input.id}` : input.name ? `[name="${input.name}"]` : null
+                    };
+                });
+
+                // Extract all selects
+                const allSelects = Array.from(document.querySelectorAll('select')).map(select => {
+                    const options = Array.from(select.options).map(opt => opt.text.trim());
+                    const selectedValue = select.value;
+                    const selectedText = select.options[select.selectedIndex]?.text.trim() || null;
+
+                    const label = document.querySelector(`label[for="${select.id}"]`) ||
+                                 select.closest('label') ||
+                                 select.previousElementSibling?.tagName === 'LABEL' ? select.previousElementSibling : null;
+
+                    return {
+                        name: select.name || select.id || null,
+                        label: label ? getVisibleText(label) : null,
+                        options: options,
+                        selected_value: selectedValue,
+                        selected_text: selectedText,
+                        selector: select.id ? `#${select.id}` : select.name ? `[name="${select.name}"]` : null
+                    };
+                });
+
                 return {
                     url: window.location.href,
                     title: document.title,
@@ -104,6 +177,9 @@ Contains: buttons/links positions, DevTools console (last 10 logs), network requ
                         height: window.innerHeight
                     },
                     interactive_elements: interactive,
+                    forms: forms,
+                    inputs: allInputs,
+                    selects: allSelects,
                     console: {
                         logs: consoleLogs.slice(-10),  // Last 10 logs
                         total: consoleLogs.length

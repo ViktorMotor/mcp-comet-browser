@@ -35,9 +35,9 @@ def _create_connection_no_proxy(url, **options):
         options['http_proxy_port'] = None
         options['proxy_type'] = None
 
-        # STABILITY FIX: Enable WebSocket keep-alive (ping/pong)
-        # Prevents idle timeout disconnections
-        options['ping_interval'] = 30      # Send ping every 30 seconds
+        # STABILITY FIX (v3.0.0): Enable WebSocket keep-alive (ping/pong)
+        # Prevents idle timeout disconnections. Reduced intervals for better stability.
+        options['ping_interval'] = 20      # Send ping every 20 seconds (reduced from 30)
         options['ping_timeout'] = 10       # Wait for pong 10 seconds
         options['enable_multithread'] = True
 
@@ -403,13 +403,13 @@ class BrowserConnection:
             return {"success": False, "error": str(e)}
 
     async def _health_check_loop(self):
-        """Background task that monitors connection health and auto-reconnects"""
-        logger.info("Health check loop started (interval: 45s)")
+        """Background task that monitors connection health and auto-reconnects (v3.0.0: 30s interval)"""
+        logger.info("Health check loop started (interval: 30s, reduced from 45s for better stability)")
 
         while self._health_check_running:
             try:
-                # Wait before next check
-                await asyncio.sleep(45)
+                # Wait before next check (v3.0.0: reduced from 45s to 30s)
+                await asyncio.sleep(30)
 
                 # Check if connection is alive with simple evaluation
                 if self.cdp:
