@@ -59,11 +59,16 @@ Contains: buttons/links positions, DevTools console (last 10 logs), network requ
                 const semanticElements = Array.from(document.querySelectorAll(semanticSelector));
                 interactiveElements.push(...semanticElements);
 
-                // 2. Visually clickable elements (cursor: pointer) - like lead cards!
+                // 2. Visually clickable elements - UPDATED (v3.0.1): All interactive cursors
                 const potentialClickable = Array.from(document.querySelectorAll('div, span, li, section, article, header'));
                 for (const el of potentialClickable) {
                     const style = window.getComputedStyle(el);
-                    if (style.cursor === 'pointer' || el.onclick !== null) {
+
+                    // Check for ANY interactive cursor type (v3.0.1: expanded from pointer-only)
+                    const interactiveCursors = ['pointer', 'move', 'grab', 'grabbing', 'zoom-in', 'zoom-out', 'all-scroll'];
+                    const hasInteractiveCursor = interactiveCursors.includes(style.cursor);
+
+                    if (hasInteractiveCursor || el.onclick !== null) {
                         interactiveElements.push(el);
                     }
                 }
@@ -72,7 +77,15 @@ Contains: buttons/links positions, DevTools console (last 10 logs), network requ
                 const interactive = [...new Set(interactiveElements)]
                     .filter(el => {
                         const rect = el.getBoundingClientRect();
-                        return rect.width > 0 && rect.height > 0 && el.offsetParent !== null;
+                        const style = window.getComputedStyle(el);
+
+                        // FIXED (v3.0.1): Complete visibility validation (was missing display/visibility/opacity)
+                        return rect.width > 0 &&
+                               rect.height > 0 &&
+                               style.display !== 'none' &&
+                               style.visibility !== 'hidden' &&
+                               parseFloat(style.opacity) > 0 &&
+                               el.offsetParent !== null;
                     })
                     .map(el => {
                         const rect = el.getBoundingClientRect();

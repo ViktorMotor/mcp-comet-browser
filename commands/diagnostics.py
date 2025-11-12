@@ -119,6 +119,9 @@ class GetClickableElementsCommand(Command):
 
             js_code = f"""
             (function() {{
+                let allElements = [];
+
+                // 1. Semantic clickable elements
                 const clickableSelectors = [
                     'button',
                     'a',
@@ -130,8 +133,21 @@ class GetClickableElementsCommand(Command):
                     'input[type="submit"]',
                     '[tabindex]'
                 ];
+                const semanticElements = Array.from(document.querySelectorAll(clickableSelectors.join(',')));
+                allElements.push(...semanticElements);
 
-                const elements = Array.from(document.querySelectorAll(clickableSelectors.join(',')));
+                // 2. ADDED (v3.0.1): Visually clickable elements with interactive cursors
+                const potentialClickable = Array.from(document.querySelectorAll('div, span, li, section, article, header'));
+                for (const el of potentialClickable) {{
+                    const style = window.getComputedStyle(el);
+                    const interactiveCursors = ['pointer', 'move', 'grab', 'grabbing', 'zoom-in', 'zoom-out', 'all-scroll'];
+                    if (interactiveCursors.includes(style.cursor) || el.onclick !== null) {{
+                        allElements.push(el);
+                    }}
+                }}
+
+                // Remove duplicates
+                const elements = [...new Set(allElements)];
                 const visibleOnly = {str(visible_only).lower()};
 
                 const results = elements
@@ -142,7 +158,8 @@ class GetClickableElementsCommand(Command):
                         const isVisible = rect.width > 0 && rect.height > 0 &&
                                          style.display !== 'none' &&
                                          style.visibility !== 'hidden' &&
-                                         parseFloat(style.opacity) > 0;
+                                         parseFloat(style.opacity) > 0 &&
+                                         el.offsetParent !== null;  // ADDED (v3.0.1): offsetParent check
 
                         if (visibleOnly && !isVisible) return null;
 
@@ -152,6 +169,7 @@ class GetClickableElementsCommand(Command):
                             id: el.id || null,
                             role: el.getAttribute('role'),
                             ariaLabel: el.getAttribute('aria-label'),
+                            cursor: style.cursor,  // ADDED (v3.0.1): include cursor type
                             visible: isVisible,
                             position: {{
                                 x: Math.round(rect.left + rect.width / 2),

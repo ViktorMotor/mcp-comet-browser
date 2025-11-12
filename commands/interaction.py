@@ -178,7 +178,7 @@ Auto-scrolls to element and shows cursor animation."""
                 const isVisible = rect.width > 0 && rect.height > 0 &&
                                  style.display !== 'none' &&
                                  style.visibility !== 'hidden' &&
-                                 style.opacity !== '0';
+                                 parseFloat(style.opacity) > 0;  // FIXED (v3.0.1): numeric comparison
 
                 if (!isVisible) {{
                     return {{
@@ -386,15 +386,27 @@ Tip: Use save_page_info() first to see available elements and verify click worke
                 const semanticElements = Array.from(document.querySelectorAll(semanticSelector));
                 elements.push(...semanticElements);
 
-                // 2. OPTIMIZED (v3.0.0): Find visually clickable elements via CSS
-                // Instead of getComputedStyle for each element (O(n²)), use CSS selector
-                // This reduces overhead from ~1000 getComputedStyle calls to ~50 on typical pages
-                const visuallyClickable = Array.from(document.querySelectorAll('[style*="cursor: pointer"], [style*="cursor:pointer"]'));
-                elements.push(...visuallyClickable);
+                // 2. FIXED (v3.0.1): Find visually clickable elements via getComputedStyle
+                // Previous v3.0.0 used CSS selector optimization that BROKE React/Vue apps
+                // CSS selector only finds inline styles, misses CSS class-based cursors
+                // This is the correct approach used by save_page_info
+                const potentialClickable = Array.from(document.querySelectorAll('div, span, li, section, article, header'));
 
-                // 3. Find elements with click handlers (fast check, no getComputedStyle)
-                const withHandlers = Array.from(document.querySelectorAll('[onclick]'));
-                elements.push(...withHandlers);
+                for (const el of potentialClickable) {{
+                    const style = window.getComputedStyle(el);
+
+                    // Check for ANY interactive cursor type (not just pointer!)
+                    // Supports: pointer, move, grab, grabbing, zoom-in, zoom-out, all-scroll
+                    const interactiveCursors = ['pointer', 'move', 'grab', 'grabbing', 'zoom-in', 'zoom-out', 'all-scroll'];
+                    const hasInteractiveCursor = interactiveCursors.includes(style.cursor);
+
+                    // Check onclick PROPERTY (not attribute) - catches React event delegation
+                    const hasOnclick = el.onclick !== null;
+
+                    if (hasInteractiveCursor || hasOnclick) {{
+                        elements.push(el);
+                    }}
+                }}
 
                 // Remove duplicates
                 elements = [...new Set(elements)];
@@ -415,7 +427,7 @@ Tip: Use save_page_info() first to see available elements and verify click worke
                            rect.height > 0 &&
                            style.display !== 'none' &&
                            style.visibility !== 'hidden' &&
-                           style.opacity !== '0' &&
+                           parseFloat(style.opacity) > 0 &&  // FIXED (v3.0.1): numeric comparison
                            el.offsetParent !== null;
                 }}
 

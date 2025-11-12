@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>React SPA Test - Event Delegation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+
+        /* React lead card simulation - cursor set via CSS class */
+        .lead-card {
+            border: 1px solid #ccc;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            cursor: move;  /* Key: cursor set via CSS, not inline! */
+            background: #f9f9f9;
+            transition: box-shadow 0.2s;
+        }
+
+        .lead-card:hover {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        /* Button with cursor: pointer via CSS */
+        .btn-primary {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        /* Element with opacity */
+        .semi-transparent {
+            opacity: 0.5;
+            cursor: pointer;
+        }
+
+        /* Hidden elements */
+        .hidden-display {
+            display: none;
+            cursor: pointer;
+        }
+
+        .hidden-visibility {
+            visibility: hidden;
+            cursor: pointer;
+        }
+
+        .hidden-opacity {
+            opacity: 0;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>React SPA Test Page - Event Delegation Patterns</h1>
+    <p>This page simulates React/Vue event delegation patterns where onclick is set via JavaScript, not inline attributes.</p>
+
+    <!-- React-style lead cards - onclick set via addEventListener (not inline attribute!) -->
+    <div id="leads-container">
+        <div class="lead-card" data-lead-id="1">
+            <h3>Тестовая сделка</h3>
+            <p>Контакт не указан</p>
+            <p>Дата: 12.11.2025</p>
+        </div>
+
+        <div class="lead-card" data-lead-id="2">
+            <h3>Важная сделка</h3>
+            <p>Контакт: Иван Иванов</p>
+            <p>Дата: 15.11.2025</p>
+        </div>
+
+        <div class="lead-card" data-lead-id="3">
+            <h3>Срочная сделка</h3>
+            <p>Контакт: Мария Петрова</p>
+            <p>Дата: 18.11.2025</p>
+        </div>
+    </div>
+
+    <hr>
+
+    <!-- Buttons with CSS-based cursor styles -->
+    <div>
+        <button class="btn-primary" id="submit-btn">Submit Form</button>
+        <button class="btn-primary" id="cancel-btn">Cancel</button>
+    </div>
+
+    <hr>
+
+    <!-- Visibility edge cases -->
+    <div>
+        <h3>Visibility Test Cases</h3>
+        <div class="semi-transparent" id="semi-visible">Semi-transparent (opacity: 0.5)</div>
+        <div class="hidden-display" id="display-none">Hidden with display:none</div>
+        <div class="hidden-visibility" id="visibility-hidden">Hidden with visibility:hidden</div>
+        <div class="hidden-opacity" id="opacity-zero">Hidden with opacity:0</div>
+    </div>
+
+    <script>
+        // Simulate React event delegation - attach handlers to parent, not individual cards
+        // This is why click_by_text was failing!
+        const leadsContainer = document.getElementById('leads-container');
+
+        leadsContainer.addEventListener('click', function(event) {
+            const card = event.target.closest('.lead-card');
+            if (card) {
+                const leadId = card.getAttribute('data-lead-id');
+                console.log('Lead clicked:', leadId);
+                alert('Lead clicked: ' + card.querySelector('h3').textContent);
+            }
+        });
+
+        // Also set onclick property for testing (simulates React synthetic events)
+        document.querySelectorAll('.lead-card').forEach(card => {
+            card.onclick = function() {
+                console.log('onclick property triggered');
+            };
+        });
+
+        // Button handlers
+        document.getElementById('submit-btn').addEventListener('click', function() {
+            console.log('Submit clicked');
+            alert('Form submitted!');
+        });
+
+        document.getElementById('cancel-btn').onclick = function() {
+            console.log('Cancel clicked');
+            alert('Cancelled!');
+        };
+    </script>
+</body>
+</html>
