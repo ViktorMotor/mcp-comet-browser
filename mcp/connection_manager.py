@@ -3,7 +3,7 @@
 Manages single CDP connection shared by multiple MCP clients.
 Implements request multiplexing with ID rewriting.
 
-Version: 3.1.0
+Version: 3.1.0 (FINAL)
 """
 import asyncio
 import uuid

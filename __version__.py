@@ -1,11 +1,39 @@
 """Version information for MCP Comet Browser"""
 
-__version__ = "3.1.0-beta"
-__version_info__ = (3, 1, 0, "beta")
+__version__ = "3.1.0"
+__version_info__ = (3, 1, 0)
 __release_date__ = "2025-11-12"
 
 # Version history
 VERSION_HISTORY = {
+    "3.1.0": {
+        "date": "2025-11-12",
+        "description": "🚀 Multi-Client Support - HTTP/WebSocket Wrapper",
+        "changes": [
+            "NEW FEATURE: Multiple Claude Code instances can control same browser simultaneously",
+            "NEW: mcp_http_wrapper.py - FastAPI HTTP/WebSocket server (port 9223)",
+            "NEW: SharedBrowserConnection - Request multiplexing with ID rewriting",
+            "NEW: /health endpoint - Browser status and client statistics",
+            "NEW: /stats endpoint - Detailed metrics (requests, success rate, active clients)",
+            "NEW: /execute endpoint - Execute MCP commands via HTTP POST",
+            "NEW: /ws endpoint - WebSocket for persistent connections",
+            "NEW: /docs endpoint - Auto-generated Swagger UI",
+            "FIXED: ModuleNotFoundError - added project root to sys.path",
+            "FIXED: Now works from any directory (like windows_proxy.py)",
+            "ARCHITECTURE: HTTP wrapper → windows_proxy.py → Comet browser",
+            "DOCUMENTATION: HTTP_API_REFERENCE.md - Complete API guide (800 lines)",
+            "DOCUMENTATION: MULTI_CLIENT_QUICK_START.md - Setup guide (250 lines)",
+            "DEPENDENCIES: +4 (fastapi, uvicorn, websockets, aiohttp)",
+            "BACKWARD COMPATIBLE: Old stdio MCP continues to work (single client)"
+        ],
+        "breaking_changes": [],
+        "migration": "Install new dependencies: pip install -r requirements.txt. Start windows_proxy.py, then mcp_http_wrapper.py. Open multiple Claude Code instances.",
+        "use_cases": [
+            "Parallel development: Multiple developers working on same browser",
+            "Multi-step workflows: Different Claude Code instances for different tasks",
+            "Monitoring: HTTP clients + WebSocket + manual testing simultaneously"
+        ]
+    },
     "3.0.1": {
         "date": "2025-11-12",
         "description": "🐛 Critical Bug Fix - React Event Delegation Support",

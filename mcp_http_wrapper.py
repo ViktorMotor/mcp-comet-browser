@@ -11,7 +11,7 @@ Environment Variables:
     CDP_PROXY_HOST=127.0.0.1    # windows_proxy.py host (default: 127.0.0.1)
     CDP_PROXY_PORT=9224         # windows_proxy.py port (default: 9224)
 
-Version: 3.1.0
+Version: 3.1.0 (FINAL)
 """
 import sys
 import os
