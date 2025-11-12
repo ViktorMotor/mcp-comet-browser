@@ -115,7 +115,7 @@ client_2: {"id": 1} → internal: {"id": "client2_1"}
 **Starting the HTTP Wrapper:**
 ```powershell
 # Windows (after windows_proxy.py is running)
-py C:\Users\work2\mcp_comet_for_claude_code\mcp_http_wrapper.py
+py C:\Users\<USER>\mcp_comet_for_claude_code\mcp_http_wrapper.py
 
 # Expected output:
 # === MCP HTTP Wrapper v3.1.0 Starting ===
@@ -153,12 +153,12 @@ pip install -r requirements.txt
 
 **Step 2:** Start windows_proxy.py (as before)
 ```powershell
-py C:\Users\work2\mcp_comet_for_claude_code\windows_proxy.py
+py C:\Users\<USER>\mcp_comet_for_claude_code\windows_proxy.py
 ```
 
 **Step 3:** Start HTTP wrapper (NEW!)
 ```powershell
-py C:\Users\work2\mcp_comet_for_claude_code\mcp_http_wrapper.py
+py C:\Users\<USER>\mcp_comet_for_claude_code\mcp_http_wrapper.py
 ```
 
 **Step 4:** Open multiple Claude Code instances and test

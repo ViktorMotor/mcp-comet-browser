@@ -45,7 +45,7 @@ C:\Users\<USER>\AppData\Local\Perplexity\Comet\Application\Comet.exe --remote-de
 
 ```powershell
 # Windows PowerShell (как обычно)
-py C:\Users\work2\mcp_comet_for_claude_code\windows_proxy.py
+py C:\Users\<USER>\mcp_comet_for_claude_code\windows_proxy.py
 ```
 
 **Ожидаемый вывод:**
@@ -58,7 +58,7 @@ py C:\Users\work2\mcp_comet_for_claude_code\windows_proxy.py
 
 ```powershell
 # Windows PowerShell (новый терминал)
-py C:\Users\work2\mcp_comet_for_claude_code\mcp_http_wrapper.py
+py C:\Users\<USER>\mcp_comet_for_claude_code\mcp_http_wrapper.py
 ```
 
 **Ожидаемый вывод:**

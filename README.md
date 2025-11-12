@@ -1,5 +1,7 @@
 # MCP Server for Comet Browser
 
+**Русская версия** | **[English Version](README_EN.md)**
+
 **Версия:** 3.1.0 🚀 | **Дата релиза:** 2025-11-12
 
 MCP (Model Context Protocol) сервер для управления браузером Comet через Chrome DevTools Protocol.
@@ -26,10 +28,10 @@ MCP (Model Context Protocol) сервер для управления брауз
 **Быстрый старт с multi-client:**
 ```powershell
 # Windows: Запустить windows_proxy.py (как обычно)
-py C:\Users\work2\mcp_comet_for_claude_code\windows_proxy.py
+py C:\Users\<USER>\mcp_comet_for_claude_code\windows_proxy.py
 
 # NEW! Запустить HTTP wrapper
-py C:\Users\work2\mcp_comet_for_claude_code\mcp_http_wrapper.py
+py C:\Users\<USER>\mcp_comet_for_claude_code\mcp_http_wrapper.py
 
 # Откройте 2-3 окна Claude Code - все будут работать!
 ```
@@ -144,13 +146,13 @@ py C:\Users\work2\mcp_comet_for_claude_code\mcp_http_wrapper.py
 
 **Из Windows PowerShell:**
 ```powershell
-cd C:\Users\work2\mcp_comet_for_claude_code
+cd C:\Users\<USER>\mcp_comet_for_claude_code
 .\start_wsl.bat
 ```
 
 **ИЛИ из WSL:**
 ```bash
-cd /mnt/c/Users/work2/mcp_comet_for_claude_code
+cd /mnt/c/Users/<USER>/mcp_comet_for_claude_code
 cmd.exe /c start_wsl.bat
 ```
 
@@ -217,18 +219,18 @@ chromium --remote-debugging-port=9222
 
 **Самый простой способ - используйте автоматический скрипт:**
 
-1. **Скопируйте путь к вашему репозиторию на Windows** (например: `C:\Users\work2\mcp_comet_for_claude_code`)
+1. **Скопируйте путь к вашему репозиторию на Windows** (например: `C:\Users\<USER>\mcp_comet_for_claude_code`)
 
 2. **Запустите из WSL:**
 ```bash
 # Замените путь на ваш Windows путь
-cd /mnt/c/Users/work2/mcp_comet_for_claude_code
+cd /mnt/c/Users/<USER>/mcp_comet_for_claude_code
 cmd.exe /c start_wsl.bat
 ```
 
 **ИЛИ из Windows PowerShell:**
 ```powershell
-cd C:\Users\work2\mcp_comet_for_claude_code
+cd C:\Users\<USER>\mcp_comet_for_claude_code
 .\start_wsl.bat
 ```
 
@@ -261,14 +263,14 @@ python3 server.py
 **Способ A: Из Windows PowerShell**
 ```powershell
 # Откройте PowerShell (НЕ нужны права администратора)
-cd C:\Users\work2\mcp_comet_for_claude_code
+cd C:\Users\<USER>\mcp_comet_for_claude_code
 python windows_proxy.py
 ```
 
 **Способ B: Из WSL с помощью PowerShell.exe**
 ```bash
 # Из WSL-терминала запустить прокси на Windows
-cd /mnt/c/Users/work2/mcp_comet_for_claude_code
+cd /mnt/c/Users/<USER>/mcp_comet_for_claude_code
 powershell.exe -Command "python windows_proxy.py"
 ```
 
