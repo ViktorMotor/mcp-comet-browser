@@ -1,11 +1,36 @@
 """Version information for MCP Comet Browser"""
 
-__version__ = "3.0.0"
-__version_info__ = (3, 0, 0)
-__release_date__ = "2025-10-28"
+__version__ = "3.0.1"
+__version_info__ = (3, 0, 1)
+__release_date__ = "2025-11-12"
 
 # Version history
 VERSION_HISTORY = {
+    "3.0.1": {
+        "date": "2025-11-12",
+        "description": "🐛 Critical Bug Fix - React Event Delegation Support",
+        "changes": [
+            "CRITICAL FIX: click_by_text now finds React/Vue elements with CSS-based cursor styles",
+            "FIXED: Replaced CSS selector optimization with getComputedStyle (broke React apps in v3.0.0)",
+            "FIXED: Opacity validation now uses parseFloat() for proper numeric comparison",
+            "FIXED: Added missing opacity check in save_page_info visibility validation",
+            "ENHANCEMENT: Added support for interactive cursor types: move, grab, grabbing, zoom-in, zoom-out, all-scroll",
+            "ENHANCEMENT: Unified clickable element validation logic across all commands",
+            "NEW: utils/element_validation.py - centralized validation logic generator",
+            "TESTING: Added comprehensive test suite with React/Vue patterns",
+            "TESTING: Added fixtures for testing event delegation and cursor types",
+            "CONSISTENCY: All commands now use same visibility validation (display, visibility, opacity, offsetParent)"
+        ],
+        "bug_fixed": [
+            "v3.0.0 optimization broke React/Vue apps - click_by_text used inline style check only",
+            "CSS selector '[style*=\"cursor: pointer\"]' missed CSS class-based cursors",
+            "String comparison 'opacity !== \"0\"' failed for values like \"0.5\"",
+            "save_page_info missing display/visibility/opacity checks",
+            "get_clickable_elements only checked semantic selectors (no visual)"
+        ],
+        "migration": "No breaking changes. All fixes are backward-compatible. Just update version.",
+        "root_cause": "v3.0.0 performance optimization prioritized speed over correctness, breaking modern SPA compatibility"
+    },
     "3.0.0": {
         "date": "2025-10-28",
         "description": "🚀 Major Release - Performance, Stability & Form Automation",

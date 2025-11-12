@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cursor Types Test - Interactive Elements</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+
+        .test-element {
+            padding: 20px;
+            margin: 10px 0;
+            border: 2px solid #333;
+            border-radius: 8px;
+            background: #f0f0f0;
+            width: 300px;
+        }
+
+        .cursor-pointer { cursor: pointer; }
+        .cursor-move { cursor: move; }
+        .cursor-grab { cursor: grab; }
+        .cursor-grabbing { cursor: grabbing; }
+        .cursor-zoom-in { cursor: zoom-in; }
+        .cursor-zoom-out { cursor: zoom-out; }
+        .cursor-all-scroll { cursor: all-scroll; }
+
+        /* Non-interactive cursors (should NOT be detected) */
+        .cursor-default { cursor: default; }
+        .cursor-text { cursor: text; }
+        .cursor-not-allowed { cursor: not-allowed; }
+        .cursor-wait { cursor: wait; }
+
+        .interactive { background-color: #d4edda; border-color: #28a745; }
+        .non-interactive { background-color: #f8d7da; border-color: #dc3545; }
+    </style>
+</head>
+<body>
+    <h1>Cursor Types Test Page</h1>
+    <p>Tests all interactive cursor types supported by MCP Comet Browser v3.0.1</p>
+
+    <h2>Interactive Cursor Types (Should Be Detected)</h2>
+
+    <div class="test-element cursor-pointer interactive" id="pointer-el">
+        <strong>cursor: pointer</strong>
+        <p>Standard clickable cursor (e.g., buttons, links)</p>
+    </div>
+
+    <div class="test-element cursor-move interactive" id="move-el">
+        <strong>cursor: move</strong>
+        <p>Movable/draggable cursor (e.g., React lead cards, draggable items)</p>
+    </div>
+
+    <div class="test-element cursor-grab interactive" id="grab-el">
+        <strong>cursor: grab</strong>
+        <p>Grabbable cursor (idle state for draggable elements)</p>
+    </div>
+
+    <div class="test-element cursor-grabbing interactive" id="grabbing-el">
+        <strong>cursor: grabbing</strong>
+        <p>Grabbing cursor (active drag state)</p>
+    </div>
+
+    <div class="test-element cursor-zoom-in interactive" id="zoom-in-el">
+        <strong>cursor: zoom-in</strong>
+        <p>Zoom-in cursor (e.g., zoomable images)</p>
+    </div>
+
+    <div class="test-element cursor-zoom-out interactive" id="zoom-out-el">
+        <strong>cursor: zoom-out</strong>
+        <p>Zoom-out cursor (e.g., zoomed images)</p>
+    </div>
+
+    <div class="test-element cursor-all-scroll interactive" id="all-scroll-el">
+        <strong>cursor: all-scroll</strong>
+        <p>All-direction scroll cursor (e.g., panning views)</p>
+    </div>
+
+    <hr>
+
+    <h2>Non-Interactive Cursor Types (Should NOT Be Detected)</h2>
+
+    <div class="test-element cursor-default non-interactive" id="default-el">
+        <strong>cursor: default</strong>
+        <p>Default cursor (normal, not interactive)</p>
+    </div>
+
+    <div class="test-element cursor-text non-interactive" id="text-el">
+        <strong>cursor: text</strong>
+        <p>Text cursor (for editing, not clicking)</p>
+    </div>
+
+    <div class="test-element cursor-not-allowed non-interactive" id="not-allowed-el">
+        <strong>cursor: not-allowed</strong>
+        <p>Not-allowed cursor (disabled state)</p>
+    </div>
+
+    <div class="test-element cursor-wait non-interactive" id="wait-el">
+        <strong>cursor: wait</strong>
+        <p>Wait cursor (loading state)</p>
+    </div>
+
+    <script>
+        // Add click handlers to all interactive elements
+        document.querySelectorAll('.interactive').forEach(el => {
+            el.onclick = function() {
+                const cursorType = this.id.replace('-el', '');
+                console.log('Clicked:', cursorType);
+                alert('Clicked: ' + cursorType);
+            };
+        });
+
+        // Log page load
+        console.log('Cursor types test page loaded');
+        console.log('Interactive elements:', document.querySelectorAll('.interactive').length);
+        console.log('Non-interactive elements:', document.querySelectorAll('.non-interactive').length);
+    </script>
+</body>
+</html>
